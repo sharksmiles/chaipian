@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拆片 · 把爆款拆成公式</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brand">
+      <h1 class="brand-name">拆片</h1>
+      <p class="brand-sub">CHAI PIAN · 视频逆向解析工作台 · 把爆款拆成公式 · 本地运行</p>
+    </div>
+    <div class="mast-status" id="cfg" aria-live="polite">
+      <span class="dot" id="cfg-dot"></span>
+      <span id="cfg-text">检测配置…</span>
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- 左侧：控制台 -->
+  <aside class="rail">
+    <section class="rail-section">
+      <h2 class="rail-title" data-no="01">输入样本</h2>
+      <form id="analyze-form">
+        <input id="url" type="text" required
+               placeholder="粘贴视频链接：B站 / YouTube / 抖音 / 快手…"
+               autocomplete="off" spellcheck="false">
+        <div class="form-row">
+          <button class="btn btn-primary" id="go-btn" type="submit">开始拆解</button>
+          <button class="btn btn-ghost" id="cancel-btn" type="button" hidden>中止</button>
+        </div>
+        <details class="advanced">
+          <summary>高级选项</summary>
+          <label class="field">
+            <span class="field-label">转写引擎</span>
+            <select id="engine">
+              <option value="local">本地 Whisper（免费）</option>
+              <option value="api">云端 ASR 接口</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">Whisper 模型</span>
+            <select id="whisper-model">
+              <option value="tiny">tiny · 最快</option>
+              <option value="small" selected>small · 推荐</option>
+              <option value="medium">medium · 最准</option>
+            </select>
+          </label>
+          <label class="field field-check">
+            <input type="checkbox" id="vision" checked>
+            <span class="field-label">画面提示词反推（需视觉模型）</span>
+          </label>
+          <p class="advanced-note" id="vision-note" hidden>视觉模型未配置：跳过反推，可在 config.json 的 vision 中填写 gpt-4o / doubao-vision / glm-4v 等模型。</p>
+        </details>
+      </form>
+    </section>
+
+    <section class="rail-section rail-grow">
+      <h2 class="rail-title" data-no="02">拆解日志</h2>
+      <ol class="log" id="log" aria-live="polite"></ol>
+    </section>
+  </aside>
+
+  <!-- 右侧：画布 -->
+  <section class="canvas">
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="work" role="tab">拆解</button>
+      <button class="tab" data-tab="hooks" role="tab">钩子库</button>
+      <button class="tab" data-tab="prompts" role="tab">提示词库</button>
+      <button class="tab" data-tab="history" role="tab">历史报告</button>
+    </nav>
+
+    <div class="panel" id="panel-work" role="tabpanel">
+      <div class="empty" id="work-empty">
+        <p class="empty-kicker">等待样本</p>
+        <h3>把一条爆款视频，拆成一张可复制的公式卡</h3>
+        <p>粘贴链接 → 自动下载、转写、七维拆解（+画面提示词反推）→ 生成报告，并沉淀进钩子库与提示词库。左侧日志实时跟踪每一步。</p>
+      </div>
+      <article class="report" id="report" hidden></article>
+    </div>
+
+    <div class="panel" id="panel-hooks" role="tabpanel" hidden>
+      <div class="lib-head">
+        <h3 class="lib-title">钩子库</h3>
+        <form class="lib-search" id="hooks-search">
+          <input type="text" placeholder="搜索钩子类型 / 公式 / 可迁移选题…">
+          <button class="btn btn-ghost" type="submit">检索</button>
+        </form>
+      </div>
+      <div class="lib-list" id="hooks-list"></div>
+      <div class="lib-empty" id="hooks-empty" hidden>
+        <p class="empty-kicker">暂无记录</p>
+        <p>完成一次拆解后，钩子公式会自动沉淀到这里。</p>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-prompts" role="tabpanel" hidden>
+      <div class="lib-head">
+        <h3 class="lib-title">提示词库</h3>
+        <form class="lib-search" id="prompts-search">
+          <input type="text" placeholder="搜索风格关键词 / 整体提示词…">
+          <button class="btn btn-ghost" type="submit">检索</button>
+        </form>
+      </div>
+      <div class="lib-list" id="prompts-list"></div>
+      <div class="lib-empty" id="prompts-empty" hidden>
+        <p class="empty-kicker">暂无记录</p>
+        <p>启用画面提示词反推并完成拆解后，反推结果会自动沉淀到这里。</p>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-history" role="tabpanel" hidden>
+      <div class="lib-head">
+        <h3 class="lib-title">历史报告</h3>
+      </div>
+      <div class="lib-list" id="history-list"></div>
+      <div class="lib-empty" id="history-empty" hidden>
+        <p class="empty-kicker">暂无报告</p>
+        <p>拆解报告会按日期保存在 reports/ 目录，也在下方可随时回看。</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>拆片 · 仅供学习研究 · 请遵守平台协议与版权法规</span>
+  <span class="foot-eng">DECOMPOSE · NOT REPLICATE</span>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

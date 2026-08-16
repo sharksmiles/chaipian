@@ -1,0 +1,266 @@
+/* 爆款拆解台 · 前端逻辑 */
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+const state = { jobId: null, timer: null, seen: 0 };
+
+async function api(path, opt) {
+  const r = await fetch(path, opt);
+  let d = {};
+  try { d = await r.json(); } catch (e) { /* 忽略 */ }
+  if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+  return d;
+}
+
+function logLine(line, cls) {
+  const li = document.createElement("li");
+  li.textContent = line;
+  if (cls) li.classList.add(cls);
+  $("#log").appendChild(li);
+  $("#log").scrollTop = $("#log").scrollHeight;
+}
+
+function clsFor(line) {
+  if (line.startsWith("✅")) return "l-done";
+  if (line.includes("⚠️")) return "l-warn";
+  if (/^[①②③④⑤]/.test(line)) return "l-step";
+  if (line.startsWith("❌")) return "l-err";
+  return "";
+}
+
+function resetLog() {
+  $("#log").innerHTML = "";
+  state.seen = 0;
+}
+
+function resetBtns() {
+  $("#go-btn").disabled = false;
+  $("#cancel-btn").hidden = true;
+  $("#cancel-btn").disabled = false;
+}
+
+/* ── 初始化：读取配置状态 ─────────── */
+async function initCfg() {
+  try {
+    const c = await api("/api/config");
+    const issues = [];
+    if (!c.llm_configured) issues.push("未配置 LLM Key");
+    if (!c.vision_available) {
+      issues.push("未配置视觉模型");
+      $("#vision").checked = false;
+      $("#vision").disabled = true;
+      $("#vision-note").hidden = false;
+    }
+    const dot = $("#cfg-dot");
+    const tx = $("#cfg-text");
+    if (issues.length) {
+      dot.classList.add("amber");
+      tx.textContent = issues.join(" / ");
+    } else {
+      dot.classList.add("ok");
+      const parts = [c.llm_model || "LLM"];
+      if (c.vision_available) parts.push("+" + c.vision_model);
+      tx.textContent = "就绪 · " + parts.join(" ");
+    }
+  } catch (e) {
+    $("#cfg-text").textContent = "配置读取失败：" + e.message;
+  }
+}
+
+/* ── 拆解任务 ─────────────────────── */
+$("#analyze-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const url = $("#url").value.trim();
+  if (!/^https?:\/\//.test(url)) {
+    logLine("❌ 请粘贴 http(s) 开头的视频链接", "l-err");
+    return;
+  }
+  resetLog();
+  $("#go-btn").disabled = true;
+  $("#cancel-btn").hidden = false;
+  try {
+    const body = {
+      url,
+      engine: $("#engine").value,
+      whisper_model: $("#whisper-model").value,
+      vision: $("#vision").checked,
+    };
+    const { job_id } = await api("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    state.jobId = job_id;
+    poll();
+  } catch (e) {
+    logLine("❌ 提交失败：" + e.message, "l-err");
+    resetBtns();
+  }
+});
+
+$("#cancel-btn").addEventListener("click", async () => {
+  if (!state.jobId) return;
+  $("#cancel-btn").disabled = true;
+  try {
+    await api("/api/cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: state.jobId }),
+    });
+    logLine("⏹ 已请求中止，等待当前步骤结束…", "l-warn");
+  } catch (e) { /* 忽略 */ }
+});
+
+async function poll() {
+  clearTimeout(state.timer);
+  try {
+    const s = await api("/api/status?id=" + state.jobId);
+    const lines = s.progress || [];
+    while (state.seen < lines.length) {
+      logLine(lines[state.seen], clsFor(lines[state.seen]));
+      state.seen++;
+    }
+    if (s.status === "running") {
+      state.timer = setTimeout(poll, 1500);
+      return;
+    }
+    if (s.status === "done") {
+      showReport(s.report);
+      resetBtns();
+      return;
+    }
+    if (s.status === "error") {
+      logLine("❌ " + (s.error || "未知错误"), "l-err");
+      resetBtns();
+      return;
+    }
+  } catch (e) {
+    logLine("❌ 状态查询失败：" + e.message, "l-err");
+    resetBtns();
+  }
+}
+
+function showReport(report) {
+  $("#work-empty").hidden = true;
+  const el = $("#report");
+  el.innerHTML = report.html;
+  el.hidden = false;
+  document.title = report.title + " · 拆片";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* ── 标签切换 ─────────────────────── */
+$$(".tab").forEach((t) =>
+  t.addEventListener("click", () => switchTab(t.dataset.tab))
+);
+
+function switchTab(name) {
+  $$(".tab").forEach((t) => t.classList.toggle("is-active", t.dataset.tab === name));
+  $$(".panel").forEach((p) => (p.hidden = p.id !== "panel-" + name));
+  if (name === "hooks") loadLib("hooks");
+  if (name === "prompts") loadLib("prompts");
+  if (name === "history") loadHistory();
+}
+
+/* ── 钩子库 / 提示词库 ────────────── */
+async function loadLib(kind) {
+  const list = $("#" + kind + "-list");
+  const empty = $("#" + kind + "-empty");
+  const q = ($("#" + kind + "-search input").value || "").trim();
+  list.innerHTML = "";
+  let results = [];
+  try {
+    const d = await api(`/api/${kind}?q=${encodeURIComponent(q)}`);
+    results = d.results || [];
+  } catch (e) {
+    list.innerHTML = `<p class="lib-empty">加载失败：${e.message}</p>`;
+    return;
+  }
+  empty.hidden = results.length > 0;
+  list.hidden = results.length === 0;
+  if (kind === "hooks") renderHooks(results, list);
+  else renderPrompts(results, list);
+}
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s == null ? "" : String(s);
+  return d.innerHTML;
+}
+
+function renderHooks(items, list) {
+  for (const r of items) {
+    const div = document.createElement("div");
+    div.className = "lib-item";
+    const reuse = (r.reusable || []).filter(Boolean).slice(0, 3);
+    div.innerHTML = `
+      <p class="lib-item-title">${esc(r.title || "未命名")}</p>
+      <p class="lib-item-meta">${esc(r.date)} · ${esc(r.platform || "")} · ${esc(r.url || "")}</p>
+      <p class="lib-item-line"><b>钩子类型</b>　<span class="tag">${esc(r.hook_type || "-")}</span></p>
+      <p class="lib-item-line"><b>一句话钩子</b>　${esc(r.hook_one_liner || "-")}</p>
+      ${r.hook_formula ? `<p class="lib-item-line"><b>钩子公式</b>　${esc(r.hook_formula)}</p>` : ""}
+      ${reuse.map((x) => `<p class="lib-item-line"><b>可复用</b>　${esc(x)}</p>`).join("")}
+      ${r.transfer_topic ? `<p class="lib-item-line"><b>可迁移</b>　${esc(r.transfer_topic)}</p>` : ""}`;
+    div.addEventListener("click", () => openUrl(r.url));
+    list.appendChild(div);
+  }
+}
+
+function renderPrompts(items, list) {
+  for (const r of items) {
+    const div = document.createElement("div");
+    div.className = "lib-item";
+    const kws = (r.style_keywords || []).slice(0, 8).map((k) => `<span class="tag">${esc(k)}</span>`).join(" ");
+    div.innerHTML = `
+      <p class="lib-item-title">${esc(r.title || "未命名")}</p>
+      <p class="lib-item-meta">${esc(r.date)} · ${esc(r.platform || "")} · ${esc(r.url || "")}</p>
+      <p class="lib-item-line"><b>类型判断</b>　${esc(r.video_type || "-")}</p>
+      ${r.overall_zh ? `<p class="lib-item-line"><b>整体提示词(ZH)</b>　${esc(r.overall_zh)}</p>` : ""}
+      ${kws ? `<p class="lib-item-line"><b>风格</b>　${kws}</p>` : ""}
+      ${r.recreate_notes ? `<p class="lib-item-line"><b>复刻建议</b>　${esc(r.recreate_notes)}</p>` : ""}`;
+    div.addEventListener("click", () => openUrl(r.url));
+    list.appendChild(div);
+  }
+}
+
+function openUrl(url) {
+  if (url) window.open(url, "_blank", "noopener");
+}
+
+$("#hooks-search").addEventListener("submit", (ev) => { ev.preventDefault(); loadLib("hooks"); });
+$("#prompts-search").addEventListener("submit", (ev) => { ev.preventDefault(); loadLib("prompts"); });
+
+/* ── 历史报告 ─────────────────────── */
+async function loadHistory() {
+  const list = $("#history-list");
+  const empty = $("#history-empty");
+  list.innerHTML = "";
+  let reports = [];
+  try {
+    reports = await api("/api/reports");
+  } catch (e) {
+    list.innerHTML = `<p class="lib-empty">加载失败：${e.message}</p>`;
+    return;
+  }
+  empty.hidden = reports.length > 0;
+  list.hidden = reports.length === 0;
+  for (const r of reports) {
+    const div = document.createElement("div");
+    div.className = "lib-item";
+    div.innerHTML = `
+      <p class="lib-item-meta">${esc(r.date || "")}</p>
+      <p class="lib-item-title">${esc(r.name.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/\.md$/, ""))}</p>`;
+    div.addEventListener("click", async () => {
+      try {
+        const d = await api("/api/report?name=" + encodeURIComponent(r.name));
+        showReport(d);
+        switchTab("work");
+      } catch (e) {
+        logLine("❌ 读取报告失败：" + e.message, "l-err");
+      }
+    });
+    list.appendChild(div);
+  }
+}
+
+initCfg();

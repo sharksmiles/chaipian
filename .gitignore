@@ -1,0 +1,21 @@
+# 依赖（体积大，重新安装即可）
+vendor/
+
+# 运行产物
+work/
+reports/
+library/
+
+# 本地配置（含 API Key，只提交 config.example.json）
+config.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
