@@ -1,5 +1,6 @@
 """下载解析：yt-dlp 封装（音频轨转写 + 视频轨抽帧，无需 ffmpeg 合并）"""
 import pathlib
+import re
 import sys
 import urllib.parse
 
@@ -7,6 +8,17 @@ from yt_dlp import YoutubeDL
 
 _AUDIO_SUFFIXES = {".m4a", ".webm", ".mp3", ".mp4", ".opus", ".ogg", ".flac", ".aac", ".wav"}
 _IGNORE_SUFFIXES = {".json", ".jpg", ".jpeg", ".png", ".webp", ".info", ".part"}
+
+
+def _normalize_url(url):
+    """把平台网页/搜索页 URL 规范化为可解析的视频直链。
+
+    例：抖音精选页 https://www.douyin.com/jingxuan/search/xxx?modal_id=123 → https://www.douyin.com/video/123
+    """
+    m = re.search(r"[?&]modal_id=(\d+)", url)
+    if m and "douyin" in url:
+        return f"https://www.douyin.com/video/{m.group(1)}"
+    return url
 
 
 def _platform(url):
@@ -26,26 +38,30 @@ def _platform(url):
     return "其他"
 
 
-def fetch_video(url, work_dir, cookies_from_browser=None, prefer_combined=False):
+def fetch_video(url, work_dir, cookies_from_browser=None, prefer_combined=False, cookiefile=None):
     """返回 (meta, audio_path, video_path)。
 
     prefer_combined=False：只下载音频轨（转写用），video_path=None。
     prefer_combined=True：音频轨 + 视频画面轨都下载（提示词反推抽帧用）。
     音视频分轨下载各自是单流文件，不需要 ffmpeg 合并；视频轨失败时降级纯音频。
+
+    cookies_from_browser：浏览器名（chrome/edge/firefox），新版 Chrome/Edge 可能解密失败；
+    cookiefile：Netscape 格式 cookies.txt 路径（推荐，浏览器扩展"Get cookies.txt LOCALLY"导出）。
     """
+    url = _normalize_url(url)
     work_dir = pathlib.Path(work_dir)
-    meta, audio = _download(url, work_dir / "audio", cookies_from_browser, "bestaudio/best")
+    meta, audio = _download(url, work_dir / "audio", cookies_from_browser, "bestaudio/best", cookiefile)
     if not prefer_combined:
         return meta, audio, None
     try:
-        _m, video = _download(url, work_dir / "video", cookies_from_browser, "bestvideo/best")
+        _m, video = _download(url, work_dir / "video", cookies_from_browser, "bestvideo/best", cookiefile)
     except Exception as e:  # noqa: BLE001
         print(f"   提示：画面流下载失败（{type(e).__name__}），将跳过画面提示词反推", file=sys.stderr)
         return meta, audio, None
     return meta, audio, video
 
 
-def _download(url, out_dir, cookies_from_browser, fmt):
+def _download(url, out_dir, cookies_from_browser, fmt, cookiefile=None):
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     opts = {
@@ -58,11 +74,22 @@ def _download(url, out_dir, cookies_from_browser, fmt):
     }
     if cookies_from_browser:
         opts["cookiesfrombrowser"] = (cookies_from_browser,)
+    if cookiefile:
+        cf = pathlib.Path(cookiefile)
+        if not cf.exists():
+            raise RuntimeError(f"Cookies 文件不存在：{cookiefile}\n提示：用浏览器扩展 Get cookies.txt LOCALLY 导出后填路径")
+        opts["cookiefile"] = str(cf)
     try:
         with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
     except Exception as e:  # noqa: BLE001
-        raise RuntimeError(f"下载失败：{e}\n提示：部分平台/B站会员视频需要加 --cookies-from-browser chrome") from e
+        hint = (
+            "提示：抖音/快手/小红书等平台需要登录态 cookies。\n"
+            "　1) 推荐：浏览器装扩展 Get cookies.txt LOCALLY → 打开目标站点页面 → 导出 cookies.txt，"
+            "然后 Web 页面填路径或 CLI 加 --cookies-file <路径>\n"
+            "　2) 或尝试 --cookies-from-browser chrome/edge（新版 Chrome/Edge 可能解密失败）；B站会员视频同样需要"
+        )
+        raise RuntimeError(f"下载失败：{e}\n{hint}") from e
     if not info:
         raise RuntimeError("yt-dlp 未能解析该链接")
 

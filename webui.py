@@ -150,6 +150,7 @@ class Handler(BaseHTTPRequestHandler):
                 "whisper_model": body.get("whisper_model") or "small",
                 "lang": body.get("lang") or "zh",
                 "cookies_from_browser": body.get("cookies") or None,
+                "cookies_file": (body.get("cookies_file") or "").strip() or None,
                 "vision": bool(body.get("vision", True)),
             }
             jid = start_job(url, opts)

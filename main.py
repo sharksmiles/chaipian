@@ -32,6 +32,7 @@ def cmd_analyze(args):
             "whisper_model": args.whisper_model,
             "lang": args.lang,
             "cookies_from_browser": args.cookies_from_browser,
+            "cookies_file": args.cookies_file,
             "vision": not args.no_vision,
         }
         report_path, meta, result = run_pipeline(
@@ -63,7 +64,8 @@ def build_parser():
     a.add_argument("--engine", choices=["local", "api"], default=None, help="转写引擎：local=faster-whisper 本地免费（默认），api=OpenAI 兼容 ASR 接口")
     a.add_argument("--whisper-model", default="small", help="本地 Whisper 模型：tiny/base/small/medium（默认 small，中文口播建议 small 及以上）")
     a.add_argument("--lang", default="zh", help="转写语言（默认 zh）")
-    a.add_argument("--cookies-from-browser", default=None, help="浏览器 cookies（如 chrome/firefox/edge），B站会员视频等需要")
+    a.add_argument("--cookies-from-browser", default=None, help="浏览器 cookies（chrome/edge/firefox），新版 Chrome/Edge 可能解密失败，优先用 --cookies-file")
+    a.add_argument("--cookies-file", default=None, help="Netscape 格式 cookies.txt 路径（推荐：浏览器扩展 Get cookies.txt LOCALLY 导出）")
     a.add_argument("--json", action="store_true", help="同时输出 LLM 原始 JSON，便于调试 prompt")
     a.add_argument("--no-vision", action="store_true", help="跳过画面提示词反推（即使已配置 vision.model）")
 

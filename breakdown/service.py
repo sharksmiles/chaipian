@@ -37,6 +37,7 @@ def run_pipeline(url, cfg=None, opts=None, on_progress=None, stop_event=None):
     whisper_model = opts.get("whisper_model") or "small"
     lang = opts.get("lang") or "zh"
     cookies = opts.get("cookies_from_browser")
+    cookies_file = opts.get("cookies_file")
 
     work = _ROOT / cfg["paths"]["work"]
     reports = _ROOT / cfg["paths"]["reports"]
@@ -46,7 +47,9 @@ def run_pipeline(url, cfg=None, opts=None, on_progress=None, stop_event=None):
     libdir.mkdir(parents=True, exist_ok=True)
 
     report(f"① 下载解析：{url}")
-    meta, audio_path, video_path = fetch_video(url, work, cookies, prefer_combined=vision_on)
+    meta, audio_path, video_path = fetch_video(
+        url, work, cookies, prefer_combined=vision_on, cookiefile=cookies_file
+    )
     report(f"　标题：{meta['title']} ｜ 作者：{meta['uploader'] or '未知'} ｜ 时长：{meta['duration']}s")
     if cancelled():
         raise RuntimeError("已取消")

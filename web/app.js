@@ -84,6 +84,7 @@ $("#analyze-form").addEventListener("submit", async (ev) => {
       engine: $("#engine").value,
       whisper_model: $("#whisper-model").value,
       vision: $("#vision").checked,
+      cookies_file: $("#cookies-file").value.trim(),
     };
     const { job_id } = await api("/api/analyze", {
       method: "POST",
