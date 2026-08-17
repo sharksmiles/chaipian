@@ -45,8 +45,17 @@ class FakeResp:
 class FakeCompletions:
     def create(self, **kwargs):
         msgs = kwargs["messages"]
+        system = msgs[0]["content"]
         user = msgs[1]["content"]
-        if isinstance(user, list):  # 视觉反推调用
+        if "合并" in system:  # 分片合并调用（文本）
+            sample = json.loads(json.dumps(VISION_OUTPUT_DEMO))
+            sample["video_type"] = "AI生成（测试判断）"
+            sample["overall_prompt"]["zh"] = "测试整体提示词"
+            sample["scene_prompts"] = [
+                {"time": "0-3s", "visual": "特写", "prompt_zh": "P1", "prompt_en": "E1", "camera": "固定", "style": "自然"}
+            ]
+            return FakeResp(json.dumps(sample, ensure_ascii=False))
+        if isinstance(user, list):  # 视觉反推调用（含图）
             assert any(p.get("type") == "image_url" for p in user)
             sample = json.loads(json.dumps(VISION_OUTPUT_DEMO))
             sample["video_type"] = "AI生成（测试判断）"
@@ -77,7 +86,7 @@ class FakeClient:
 
 def main():
     openai.OpenAI = FakeClient  # mock
-    vision_mod.extract_frames = lambda path, max_frames=8: ["QUJD", "REVG"]  # mock 抽帧
+    vision_mod.extract_frames = lambda path, max_frames=8, start=None, end=None: ["QUJD", "REVG"]  # mock 抽帧
 
     meta = {
         "url": "https://www.bilibili.com/video/BVtest",
