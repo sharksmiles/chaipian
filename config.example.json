@@ -25,5 +25,9 @@
     "reports": "reports",
     "library": "library",
     "work": "work"
+  },
+  "download": {
+    "_说明": "默认 cookies 文件路径（抖音/快手等需要）。可用 Web 页面高级选项里的'记住此路径'一键写入",
+    "cookiefile": ""
   }
 }

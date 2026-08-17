@@ -53,6 +53,7 @@ async function initCfg() {
     }
     const dot = $("#cfg-dot");
     const tx = $("#cfg-text");
+    if (c.cookiefile) $("#cookies-file").value = c.cookiefile;
     if (issues.length) {
       dot.classList.add("amber");
       tx.textContent = issues.join(" / ");
@@ -79,12 +80,20 @@ $("#analyze-form").addEventListener("submit", async (ev) => {
   $("#go-btn").disabled = true;
   $("#cancel-btn").hidden = false;
   try {
+    const cf = $("#cookies-file").value.trim();
+    if ($("#cookies-save").checked && cf) {
+      api("/api/cookiefile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: cf }),
+      }).catch(() => {});
+    }
     const body = {
       url,
       engine: $("#engine").value,
       whisper_model: $("#whisper-model").value,
       vision: $("#vision").checked,
-      cookies_file: $("#cookies-file").value.trim(),
+      cookies_file: cf,
     };
     const { job_id } = await api("/api/analyze", {
       method: "POST",

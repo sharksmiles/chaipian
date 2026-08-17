@@ -32,6 +32,9 @@ DEFAULTS = {
         "library": "library",
         "work": "work",
     },
+    "download": {
+        "cookiefile": "",  # 默认 cookies 文件路径（抖音/快手等需要），Web 页面可一键保存
+    },
 }
 
 _ENV_MAP = [
@@ -77,3 +80,11 @@ def load_config():
         if v:
             _set(cfg, keys, v)
     return cfg
+
+
+def save_cookiefile(path):
+    """把 cookies 文件路径写入 config.json（保留其他字段）"""
+    cfg = load_config()
+    cfg["download"]["cookiefile"] = (path or "").strip()
+    CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    return cfg["download"]["cookiefile"]

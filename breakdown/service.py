@@ -37,7 +37,7 @@ def run_pipeline(url, cfg=None, opts=None, on_progress=None, stop_event=None):
     whisper_model = opts.get("whisper_model") or "small"
     lang = opts.get("lang") or "zh"
     cookies = opts.get("cookies_from_browser")
-    cookies_file = opts.get("cookies_file")
+    cookies_file = opts.get("cookies_file") or (cfg.get("download") or {}).get("cookiefile") or None
 
     work = _ROOT / cfg["paths"]["work"]
     reports = _ROOT / cfg["paths"]["reports"]
@@ -100,4 +100,5 @@ def config_snapshot():
         "vision_model": vision.get("model", ""),
         "transcribe_engine": (cfg.get("transcribe") or {}).get("engine", "local"),
         "whisper_model": (cfg.get("transcribe") or {}).get("whisper_model", "small"),
+        "cookiefile": (cfg.get("download") or {}).get("cookiefile", ""),
     }

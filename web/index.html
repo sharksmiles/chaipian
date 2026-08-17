@@ -60,6 +60,10 @@
             <span class="field-label">Cookies 文件（抖音/快手需要）</span>
             <input type="text" id="cookies-file" placeholder="如 D:\cookies.txt" autocomplete="off">
           </label>
+          <label class="field field-check">
+            <input type="checkbox" id="cookies-save" checked>
+            <span class="field-label">记住此路径（写入 config.json，下次自动填入）</span>
+          </label>
           <p class="advanced-note">导出方法：浏览器装扩展 "Get cookies.txt LOCALLY" → 打开抖音页面 → 点扩展导出 cookies.txt。也可在 <code>config.json</code> 环境变量或用 CLI <code>--cookies-file</code>。</p>
           <p class="advanced-note" id="vision-note" hidden>视觉模型未配置：跳过反推，可在 config.json 的 vision 中填写 gpt-4o / doubao-vision / glm-4v 等模型。</p>
         </details>

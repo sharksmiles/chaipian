@@ -17,6 +17,7 @@ sys.path.insert(0, str(_ROOT))
 import breakdown  # noqa: F401,E402  vendor 注入 + UTF-8 输出
 
 from breakdown import library as lib  # noqa: E402
+from breakdown.config import save_cookiefile  # noqa: E402
 from breakdown.mdhtml import md_to_html  # noqa: E402
 from breakdown.service import config_snapshot, run_pipeline  # noqa: E402
 
@@ -155,6 +156,10 @@ class Handler(BaseHTTPRequestHandler):
             }
             jid = start_job(url, opts)
             return self._json(200, {"job_id": jid})
+        if path == "/api/cookiefile":
+            body = self._read_body()
+            saved = save_cookiefile((body or {}).get("path") or "")
+            return self._json(200, {"ok": True, "path": saved})
         if path == "/api/cancel":
             jid = (self._read_body() or {}).get("job_id") or ""
             with JOBS_LOCK:
