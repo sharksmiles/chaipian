@@ -25,7 +25,7 @@ DEFAULTS = {
         "model": "",  # 填了即启用画面提示词反推（需支持图像的模型，如 gpt-4o / doubao-vision / glm-4v）
         "base_url": "",
         "api_key": "",
-        "max_frames": 8,
+        "max_frames": 8,  # 每 3 秒抽 1 帧（上限 8）：实测 glm-4.6v 在 8 帧+2500 tokens 内输出最稳，10 帧会截断 JSON
         "max_tokens": 2500,  # 部分模型上限低（如智谱 glm-4v-flash 限 1024），按需调小
         "active": "",  # 多模型预设切换：presets 中生效的预设名（留空则用上面的平铺字段）
         "presets": {},  # {"预设名": {"model": ..., "base_url": ..., "api_key": ..., "max_tokens": ...}}

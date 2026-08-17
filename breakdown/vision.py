@@ -35,7 +35,8 @@ def extract_frames(video_path, max_frames=8):
     if not duration or duration <= 0:
         duration = float(stream.frames) / float(stream.average_rate) if stream.frames else 30.0
 
-    n = min(max_frames, max(3, int(duration // 15) + 1))
+    # 每 3 秒抽 1 帧（短视频至少 6 帧），保证与 2-3 秒一切的快剪节奏匹配
+    n = min(max_frames, max(6, int(duration / 3) + 1))
     targets = [duration * i / (n + 1) for i in range(1, n + 1)][::-1]
     frames = []
     for frame in container.decode(stream):
