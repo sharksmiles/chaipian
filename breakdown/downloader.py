@@ -2,6 +2,7 @@
 import pathlib
 import re
 import sys
+import time
 import urllib.parse
 
 from yt_dlp import YoutubeDL
@@ -79,17 +80,31 @@ def _download(url, out_dir, cookies_from_browser, fmt, cookiefile=None):
         if not cf.exists():
             raise RuntimeError(f"Cookies 文件不存在：{cookiefile}\n提示：用浏览器扩展 Get cookies.txt LOCALLY 导出后填路径")
         opts["cookiefile"] = str(cf)
-    try:
-        with YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-    except Exception as e:  # noqa: BLE001
-        hint = (
-            "提示：抖音/快手/小红书等平台需要登录态 cookies。\n"
-            "　1) 推荐：浏览器装扩展 Get cookies.txt LOCALLY → 打开目标站点页面 → 导出 cookies.txt，"
-            "然后 Web 页面填路径或 CLI 加 --cookies-file <路径>\n"
-            "　2) 或尝试 --cookies-from-browser chrome/edge（新版 Chrome/Edge 可能解密失败）；B站会员视频同样需要"
-        )
-        raise RuntimeError(f"下载失败：{e}\n{hint}") from e
+
+    # 抖音等平台的反爬是概率性拦截（同一 cookies 时好时坏），失败自动重试
+    last_err = None
+    for attempt in range(3):
+        try:
+            with YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+            break
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            if attempt >= 2:
+                raise
+            print(f"   接口被限流/拦截（{type(e).__name__}），5 秒后重试（{attempt + 1}/3）…", file=sys.stderr)
+            time.sleep(5)
+    if last_err is not None:
+        try:
+            raise last_err
+        except Exception as e:  # noqa: BLE001
+            hint = (
+                "提示：抖音/快手/小红书等平台需要登录态 cookies。\n"
+                "　1) 推荐：浏览器装扩展 Get cookies.txt LOCALLY → 打开目标站点页面 → 导出 cookies.txt，"
+                "然后 Web 页面填路径或 CLI 加 --cookies-file <路径>\n"
+                "　2) 或尝试 --cookies-from-browser chrome/edge（新版 Chrome/Edge 可能解密失败）；B站会员视频同样需要"
+            )
+            raise RuntimeError(f"下载失败：{e}\n{hint}") from e
     if not info:
         raise RuntimeError("yt-dlp 未能解析该链接")
 
