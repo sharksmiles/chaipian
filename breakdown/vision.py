@@ -200,6 +200,24 @@ def _merge_slices(llm, slices, max_tokens=8000):
     raise RuntimeError(f"合并分镜结果解析失败（最后错误：{last_err}）")
 
 
+def _coverage_end(result):
+    """分镜覆盖到的最晚时间（秒）"""
+    max_end = 0.0
+    for seg in result.get("scene_prompts") or []:
+        m = re.match(r"(\d+(?:\.\d+)?)\s*[-~]\s*(\d+(?:\.\d+)?)", str(seg.get("time") or ""))
+        if m:
+            max_end = max(max_end, float(m.group(2)))
+    return max_end
+
+
+def _merge_or_fallback(llm, slices):
+    try:
+        return _merge_slices(llm, slices)
+    except Exception as e:  # noqa: BLE001
+        print(f"   ⚠️ 合并失败（{e}），退回拼接模式", file=sys.stderr)
+        return _fallback_merge(slices)
+
+
 def analyze_vision(meta, lines, video_path, cfg, max_frames=None):
     """分片分帧反推提示词，返回与单次调用同结构的 dict。"""
     from openai import OpenAI
@@ -260,13 +278,33 @@ def analyze_vision(meta, lines, video_path, cfg, max_frames=None):
 
     if len(slices) == 1:
         merged = slices[0]["result"]
+        # 覆盖度自检：模型只描述了开头几帧时，自动补帧反推后半段再合并
+        covered = _coverage_end(merged)
+        if 0 < covered < duration * 0.6 and duration - covered > 3:
+            print(
+                f"   ⚠️ 模型仅覆盖到 {covered:.0f}s（总长 {duration:.0f}s），补帧反推后半段…",
+                file=sys.stderr,
+            )
+            seg_lines = _filter_lines(lines, covered, duration)
+            sys_prompt2, user2 = build_vision_messages(meta, seg_lines, frames_per_slice)
+            user2 += f"\n本批画面为视频后半段（{covered:.0f}-{duration:.0f}s），时间字段按片内相对秒填写。"
+            frames2 = extract_frames(video_path, frames_per_slice, start=covered, end=duration)
+            if frames2:
+                try:
+                    r2 = _call_vision(client, model, max_tokens, sys_prompt2, user2, frames2, "补帧")
+                    r2 = _offset_scene_times(r2, covered, duration - covered)
+                    merged = _merge_or_fallback(
+                        llm,
+                        [
+                            {"start": 0, "end": covered, "result": merged},
+                            {"start": covered, "end": duration, "result": r2},
+                        ],
+                    )
+                except Exception as e:  # noqa: BLE001
+                    print(f"   ⚠️ 补帧反推失败（保留前半段结果）：{e}", file=sys.stderr)
     else:
         print("   合并各分片结果…", file=sys.stderr)
-        try:
-            merged = _merge_slices(llm, slices)
-        except Exception as e:  # noqa: BLE001
-            print(f"   ⚠️ 合并失败（{e}），退回拼接模式", file=sys.stderr)
-            merged = _fallback_merge(slices)
+        merged = _merge_or_fallback(llm, slices)
 
     merged.setdefault("style_keywords", [])
     merged.setdefault("image_to_video_prompt", "")
