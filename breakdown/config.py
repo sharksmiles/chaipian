@@ -39,6 +39,14 @@ _ENV_MAP = [
     ("LLM_MODEL", ("llm", "model")),
 ]
 
+_PLACEHOLDER_KEY = "sk-你的key"
+
+
+def llm_key_ready(cfg):
+    """LLM Key 是否可用（排除模板占位符）"""
+    k = (cfg.get("llm") or {}).get("api_key") or ""
+    return bool(k) and k != _PLACEHOLDER_KEY
+
 
 def _merge(base, extra):
     for k, v in (extra or {}).items():

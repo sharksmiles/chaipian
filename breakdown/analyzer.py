@@ -3,6 +3,7 @@ import json
 import re
 import sys
 
+from .config import llm_key_ready
 from .prompt import build_messages
 
 
@@ -10,7 +11,7 @@ def analyze(meta, lines, cfg):
     from openai import OpenAI
 
     llm = cfg["llm"]
-    if not llm.get("api_key"):
+    if not llm_key_ready(cfg):
         raise SystemExit("未配置 LLM API Key（config.json 或环境变量 LLM_API_KEY）")
     client = OpenAI(base_url=llm.get("base_url") or None, api_key=llm["api_key"], timeout=600)
     system, user = build_messages(meta, lines)

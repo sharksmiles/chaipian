@@ -10,7 +10,7 @@ _VENDOR = _ROOT / "vendor"
 if _VENDOR.exists():
     sys.path.insert(0, str(_VENDOR))
 
-from breakdown.config import load_config  # noqa: E402
+from breakdown.config import llm_key_ready, load_config  # noqa: E402
 from breakdown.service import run_pipeline  # noqa: E402
 from breakdown import library as lib  # noqa: E402
 from breakdown import utils  # noqa: E402
@@ -23,7 +23,7 @@ API_KEY_HINT = (
 
 def cmd_analyze(args):
     cfg = load_config()
-    if not cfg["llm"]["api_key"]:
+    if not llm_key_ready(cfg):
         print(API_KEY_HINT, file=sys.stderr)
         sys.exit(2)
     try:

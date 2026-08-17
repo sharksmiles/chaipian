@@ -6,7 +6,7 @@ import json
 import pathlib
 import sys
 
-from .config import load_config
+from .config import llm_key_ready, load_config
 from .downloader import fetch_video
 from .transcriber import transcribe
 from .analyzer import analyze
@@ -90,7 +90,7 @@ def config_snapshot():
     vision = cfg.get("vision") or {}
     llm = cfg.get("llm") or {}
     return {
-        "llm_configured": bool(llm.get("api_key")),
+        "llm_configured": llm_key_ready(cfg),
         "llm_model": llm.get("model", ""),
         "vision_available": bool(vision.get("model")),
         "vision_model": vision.get("model", ""),
