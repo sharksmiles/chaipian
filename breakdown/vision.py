@@ -67,11 +67,11 @@ def analyze_vision(meta, lines, video_path, cfg, max_frames=None):
     llm = cfg.get("llm") or {}
     model = vision.get("model") or ""
     if not model:
-        raise SystemExit("未启用画面提示词反推：config.json 中 vision.model 为空（需要支持图像的模型，如 gpt-4o / doubao-vision / glm-4v）")
+        raise RuntimeError("未启用画面提示词反推：config.json 中 vision.model 为空（需要支持图像的模型，如 gpt-4o / doubao-vision / glm-4v）")
     api_key = vision.get("api_key") or llm.get("api_key")
     base_url = vision.get("base_url") or llm.get("base_url") or None
     if not api_key:
-        raise SystemExit("vision.api_key 未配置（可复用 llm.api_key）")
+        raise RuntimeError("vision.api_key 未配置（可复用 llm.api_key）")
 
     max_frames = max_frames or vision.get("max_frames") or 8
     print(f"   （抽取关键帧：≤{max_frames} 张）", file=sys.stderr)

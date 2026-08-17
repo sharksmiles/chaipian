@@ -31,7 +31,8 @@ def run_pipeline(url, cfg=None, opts=None, on_progress=None, stop_event=None):
     def cancelled():
         return stop_event is not None and stop_event.is_set()
 
-    vision_on = bool(opts.get("vision", (cfg.get("vision") or {}).get("model")))
+    vision_configured = bool((cfg.get("vision") or {}).get("model"))
+    vision_on = vision_configured and bool(opts.get("vision", True))
     engine = opts.get("engine") or None
     whisper_model = opts.get("whisper_model") or "small"
     lang = opts.get("lang") or "zh"
