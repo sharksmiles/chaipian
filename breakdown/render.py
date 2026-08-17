@@ -154,9 +154,17 @@ def render_report(result, meta, lines, reports_dir):
         p.append("\n**分镜提示词**：\n")
         p.append("| 时间 | 画面描述 | 中文提示词 | 运镜 | 风格 |")
         p.append("|---|---|---|---|---|")
-        for seg in _g(vp, "scene_prompts") or []:
+        scenes = _g(vp, "scene_prompts") or []
+        for seg in scenes:
             p.append(f"| {_fmt(_g(seg, 'time'))} | {_fmt(_g(seg, 'visual'))} | {_fmt(_g(seg, 'prompt_zh'))} "
                      f"| {_fmt(_g(seg, 'camera'))} | {_fmt(_g(seg, 'style'))} |")
+        if scenes:
+            p.append("\n**分镜完整提示词（可直接粘贴到文生视频/图生视频工具）**：\n")
+            for seg in scenes:
+                full = _fmt(_g(seg, "prompt_zh"))
+                if len(full) >= 60:  # 仅展示扩写后的完整版
+                    p.append(f"**【{_fmt(_g(seg, 'time'))}】**\n")
+                    p.append(f"```text\n{full}\n```")
         kws = _g(vp, "style_keywords")
         if isinstance(kws, list) and kws:
             p.append(f"\n**风格关键词**：{', '.join(str(k) for k in kws)}")

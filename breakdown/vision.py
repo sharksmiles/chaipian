@@ -210,6 +210,48 @@ def _coverage_end(result):
     return max_end
 
 
+EXPAND_SYSTEM = """你是 AI 视频提示词扩写专家。用户给你一份视频分镜列表（每个分镜有简短描述），
+请把每个分镜的 prompt_zh 扩写成**可直接粘贴到文生视频/图生视频工具的完整提示词**（150-220字）：
+主体（含外形/服饰细节）+ 动作 + 环境 + 景别 + 运镜 + 光影色调 + 风格质感 + 画质。
+规则：画面内容以原描述为准，严禁添加原描述中没有的元素；时间字段原样保留；输出 JSON：
+{"scene_prompts": [{"time": "0-3s", "prompt_zh": "完整提示词"}]}，分镜数量必须与输入一致、顺序不变。"""
+
+
+def _expand_scenes(llm, scenes):
+    """用文本 LLM 把每个分镜扩写成完整可用的生成提示词；失败返回 None"""
+    from openai import OpenAI
+
+    if not scenes:
+        return None
+    client = OpenAI(base_url=llm.get("base_url") or None, api_key=llm["api_key"], timeout=600)
+    payload = [
+        {"time": s.get("time", ""), "prompt_zh": s.get("prompt_zh", ""), "visual": s.get("visual", "")}
+        for s in scenes
+    ]
+    for _ in range(2):
+        try:
+            resp = client.chat.completions.create(
+                model=llm["model"],
+                messages=[
+                    {"role": "system", "content": EXPAND_SYSTEM},
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                ],
+                temperature=0.3,
+                max_tokens=8000,
+            )
+            text = resp.choices[0].message.content or ""
+        except Exception as e:  # noqa: BLE001
+            print(f"   扩写调用失败（{e}），重试一次…", file=sys.stderr)
+            continue
+        data = _parse_json(text)
+        if data is not None and isinstance(data.get("scene_prompts"), list):
+            expanded = data["scene_prompts"]
+            if len(expanded) >= len(scenes) * 0.8:
+                return expanded
+        print("   扩写输出解析失败，重试…", file=sys.stderr)
+    return None
+
+
 def _merge_or_fallback(llm, slices):
     try:
         return _merge_slices(llm, slices)
@@ -311,6 +353,25 @@ def analyze_vision(meta, lines, video_path, cfg, max_frames=None):
     merged.setdefault("recreate_notes", "")
     merged["_frame_count"] = len(slices) * frames_per_slice
     merged["_slice_count"] = len(slices)
+
+    # 分镜级扩写：把简短的场景描述扩写成可直接粘贴的完整生成提示词
+    scenes = merged.get("scene_prompts") or []
+    if scenes:
+        print("   扩写分镜提示词为完整可用版本…", file=sys.stderr)
+        expanded = _expand_scenes(llm, scenes)
+        if expanded:
+            by_time = {}
+            for e in expanded:
+                by_time[str(e.get("time", "")).strip()] = e.get("prompt_zh", "")
+            kept = 0
+            for s in scenes:
+                key = str(s.get("time", "")).strip()
+                if key in by_time and by_time[key]:
+                    s["prompt_zh"] = by_time[key]
+                    kept += 1
+            print(f"   扩写完成：{kept}/{len(scenes)} 个分镜已升级为完整提示词", file=sys.stderr)
+        else:
+            print("   ⚠️ 扩写失败，保留原始简短描述", file=sys.stderr)
     return merged
 
 

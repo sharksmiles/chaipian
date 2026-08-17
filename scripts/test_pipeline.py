@@ -47,6 +47,11 @@ class FakeCompletions:
         msgs = kwargs["messages"]
         system = msgs[0]["content"]
         user = msgs[1]["content"]
+        if "扩写" in system:  # 分镜扩写调用（文本）
+            return FakeResp(json.dumps(
+                {"scene_prompts": [{"time": "0-3s", "prompt_zh": "完整版提示词。" * 15}]},
+                ensure_ascii=False,
+            ))
         if "合并" in system:  # 分片合并调用（文本）
             sample = json.loads(json.dumps(VISION_OUTPUT_DEMO))
             sample["video_type"] = "AI生成（测试判断）"
