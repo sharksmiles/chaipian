@@ -269,7 +269,7 @@ function showSingleResult(r) {
     .join(" ｜ ");
   el.innerHTML = `
     <h2>🖼 单图六维反推结果</h2>
-    ${qp ? `<p><b>📌 快速提示词（可直接粘贴）</b></p><pre>${esc(qp)}</pre>` : ""}
+    ${qp ? `<p><b>📌 快速提示词（可直接粘贴）</b></p><div class="code-block"><button type="button" class="copy-btn" data-act="copy" data-text="${escAttr(qp)}">复制</button><pre>${esc(qp)}</pre></div>` : ""}
     ${r && r.description_zh ? `<p><b>画面深度描述</b></p><p>${esc(r.description_zh)}</p>` : ""}
     ${blocks.join("")}
     ${neg ? `<p><b>🚫 负面提示词</b>　${esc(neg)}</p>` : ""}
@@ -324,6 +324,15 @@ function escAttr(s) {
   return esc(s).replace(/"/g, "&quot;");
 }
 
+function urlLink(url) {
+  const u = url || "";
+  if (!u) return "";
+  if (/^https?:\/\//.test(u)) {
+    return `<a class="lib-url" href="${escAttr(u)}" target="_blank" rel="noopener">${esc(u)}</a>`;
+  }
+  return esc(u); // 本地文件名等非链接：纯文本展示
+}
+
 function renderHooks(items, list) {
   for (const r of items) {
     const div = document.createElement("div");
@@ -331,7 +340,7 @@ function renderHooks(items, list) {
     const reuse = (r.reusable || []).filter(Boolean).slice(0, 3);
     div.innerHTML = `
       <p class="lib-item-title">${esc(r.title || "未命名")}</p>
-      <p class="lib-item-meta">${esc(r.date)} · ${esc(r.platform || "")} · ${esc(r.url || "")}</p>
+      <p class="lib-item-meta">${esc(r.date)} · ${esc(r.platform || "")} · ${urlLink(r.url)}</p>
       <p class="lib-item-line"><b>钩子类型</b>　<span class="tag">${esc(r.hook_type || "-")}</span></p>
       <p class="lib-item-line"><b>一句话钩子</b>　${esc(r.hook_one_liner || "-")}</p>
       ${r.hook_formula ? `<p class="lib-item-line"><b>钩子公式</b>　${esc(r.hook_formula)}</p>` : ""}
@@ -340,12 +349,39 @@ function renderHooks(items, list) {
       <p class="lib-item-actions">
         <button class="btn btn-ghost btn-sm lib-del" data-act="del" data-kind="hooks" data-id="${escAttr(r.id || "")}">删除</button>
       </p>`;
-    div.addEventListener("click", (ev) => {
-      if (ev.target.closest("button")) return;
-      openUrl(r.url);
-    });
     list.appendChild(div);
   }
+}
+
+function copyBtn(text, label) {
+  if (!text) return "";
+  return `<button class="btn btn-ghost btn-sm" data-act="copy" data-text="${escAttr(text)}">${esc(label || "复制")}</button>`;
+}
+
+/* 一行提示词：label + 文本（限行省略，hover 显示全文）+ 复制（中英按钮合一） */
+function copyRow(label, zh, en, clamp) {
+  if (!zh && !en) return "";
+  const text = zh || en;
+  const preCls = "pack-pre" + (clamp ? ` clamp${clamp}` : "");
+  const btns = zh && en ? `${copyBtn(zh, "复制中")}${copyBtn(en, "复制EN")}` : copyBtn(text, "复制");
+  return `
+    <div class="pack-row lib-row">
+      <span class="pack-label">${esc(label)}</span>
+      <pre class="${preCls}" title="${escAttr(text)}">${esc(text)}</pre>
+      <span class="btn-group">${btns}</span>
+    </div>`;
+}
+
+function sceneRow(s) {
+  const text = (s && s.prompt_zh) || "";
+  if (!text) return "";
+  const meta = [s.camera && `运镜 ${s.camera}`, s.style && `风格 ${s.style}`].filter(Boolean).join(" · ");
+  return `
+    <div class="scene-row">
+      <span class="scene-head"><b>【${esc(s.time || "?")}】</b>${meta ? `<span class="scene-meta">${esc(meta)}</span>` : ""}</span>
+      <pre class="pack-pre clamp2" title="${escAttr(text)}">${esc(text)}</pre>
+      ${copyBtn(text)}
+    </div>`;
 }
 
 function renderPrompts(items, list) {
@@ -353,15 +389,29 @@ function renderPrompts(items, list) {
     const div = document.createElement("div");
     div.className = "lib-item";
     const kws = (r.style_keywords || []).slice(0, 8).map((k) => `<span class="tag">${esc(k)}</span>`).join(" ");
+    const scenes = Array.isArray(r.scene_prompts) ? r.scene_prompts : [];
+    const scenesBlock = scenes.length
+      ? scenes.map(sceneRow).join("")
+      : `<p class="lib-item-line lib-dim">该记录未保存分镜提示词（旧版本生成），重新拆解一次即可与报告第 12 节完全一致</p>`;
+    // 有改写包时：包内 negative 是按原始增强过的版本，卡片不再重复展示
+    const packNeg = r.pack && (r.pack.negative || "").trim();
+    const details = `
+      <details class="lib-details"${r.pack ? "" : " open"}>
+        <summary>完整反推内容（整体提示词 · 图生视频模板 · 分镜 ${scenes.length} 镜 · 复刻建议）</summary>
+        <div class="lib-details-body">
+          ${copyRow("整体提示词", r.overall_zh, r.overall_en, 2)}
+          ${copyRow("图生视频模板", r.image_to_video_prompt, "", 2)}
+          ${scenesBlock}
+          ${r.recreate_notes ? `<p class="lib-item-line"><b>复刻建议</b>　${esc(r.recreate_notes)}</p>` : ""}
+        </div>
+      </details>`;
     div.innerHTML = `
       <p class="lib-item-title">${esc(r.title || "未命名")}</p>
-      <p class="lib-item-meta">${esc(r.date)} · ${esc(r.platform || "")} · ${esc(r.url || "")}</p>
-      <p class="lib-item-line"><b>类型判断</b>　${esc(r.video_type || "-")}</p>
-      ${(r.quick_zh || r.quick_en) ? `<p class="lib-item-line"><b>快速提示词</b>　${esc(r.quick_zh || r.quick_en)}</p>` : ""}
-      ${r.negative_prompt ? `<p class="lib-item-line"><b>负面提示词</b>　${esc(r.negative_prompt)}</p>` : ""}
-      ${r.overall_zh ? `<p class="lib-item-line"><b>整体提示词(ZH)</b>　${esc(r.overall_zh)}</p>` : ""}
-      ${kws ? `<p class="lib-item-line"><b>风格</b>　${kws}</p>` : ""}
-      ${r.recreate_notes ? `<p class="lib-item-line"><b>复刻建议</b>　${esc(r.recreate_notes)}</p>` : ""}
+      <p class="lib-item-meta">${esc(r.date)} · ${esc(r.platform || "")} · ${urlLink(r.url)}</p>
+      <p class="lib-item-line"><b>类型</b>　${esc(r.video_type || "-")}${kws ? `　<b>风格</b>　${kws}` : ""}</p>
+      ${copyRow("快速提示词", r.quick_zh, r.quick_en, 1)}
+      ${!packNeg ? copyRow("负面提示词", r.negative_prompt, "", 1) : ""}
+      ${details}
       <p class="lib-item-actions">
         <button class="btn btn-ghost btn-sm" data-act="rewrite" data-url="${escAttr(r.url || "")}">
           ${r.pack ? "重新改写提示词包" : "改写为可直接用的提示词包"}
@@ -369,41 +419,87 @@ function renderPrompts(items, list) {
         <button class="btn btn-ghost btn-sm lib-del" data-act="del" data-kind="prompts" data-id="${escAttr(r.id || "")}">删除</button>
       </p>
       ${r.pack ? packBlock(r.pack) : ""}`;
-    div.addEventListener("click", (ev) => {
-      if (ev.target.closest("button")) return;
-      openUrl(r.url);
-    });
     list.appendChild(div);
   }
 }
 
+function timelineLine(segments) {
+  const rs = segments
+    .map((s) => {
+      const m = /(\d+(?:\.\d+)?)\s*[-~]\s*(\d+(?:\.\d+)?)/.exec(String(s.time || ""));
+      return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a[0] - b[0]);
+  if (!rs.length) return "";
+  const start = rs[0][0];
+  const end = rs[rs.length - 1][1];
+  let gaps = 0;
+  for (let i = 1; i < rs.length; i++) if (Math.abs(rs[i][0] - rs[i - 1][1]) > 1) gaps++;
+  const ok = gaps === 0;
+  return `<p class="pack-timeline${ok ? "" : " warn"}">⏱ 时间轴 ${start}-${end}s · ${rs.length} 段 · ${ok ? "连续覆盖，无缝隙" : "存在缝隙/重叠，建议重新改写"}</p>`;
+}
+
 function packBlock(p) {
-  const rows = [
-    ["Seedance 2.0/2.5（中文，直接粘贴）", p.seedance_zh],
-    ["Seedance（英文）", p.seedance_en],
-    ["可灵（中文，直接粘贴）", p.kling_zh],
-    ["可灵（英文）", p.kling_en],
-    ["即梦（中文，直接粘贴）", p.jimeng_zh],
-    ["负向提示词", p.negative],
+  // 按模型分组展示分段提示词（复刻用）：Seedance 2.0/2.5 最前，不展示整条简略版
+  const segments = (Array.isArray(p.segments) ? p.segments : [])
+    .filter((s) => s && (s.kling_zh || s.jimeng_zh || s.seedance_zh));
+  const models = [
+    ["Seedance 2.0/2.5", "seedance_zh"],
+    ["可灵", "kling_zh"],
+    ["即梦", "jimeng_zh"],
   ];
+  const blocks = models
+    .map(([name, key]) => {
+      const items = segments
+        .map((s) => ({ s, text: (s[key] || "").trim() }))
+        .filter((x) => x.text);
+      if (!items.length) return "";
+      return `
+        <p class="pack-title">${esc(name)}</p>
+        ${items
+          .map(
+            ({ s, text }) => `
+          <div class="scene-row">
+            <span class="scene-head"><b>【${esc(s.time || "?")}】</b>${s.summary ? `<span class="scene-meta">${esc(s.summary)}</span>` : ""}</span>
+            <pre class="pack-pre clamp3" title="${escAttr(text)}">${esc(text)}</pre>
+            ${copyBtn(text)}
+          </div>`
+          )
+          .join("")}`;
+    })
+    .filter(Boolean)
+    .join("");
+  if (!blocks) {
+    // 旧格式包（无分段数据）：不渲染旧内容，提示重新改写
+    return `
+      <div class="pack">
+        <p class="pack-title">提示词包</p>
+        <p class="lib-item-line lib-dim">该包是旧版本生成（无分段数据），点击上方「重新改写提示词包」升级为按模型的分段版</p>
+      </div>`;
+  }
   const params = p.params
     ? `<p class="pack-params">参数建议：${esc(Object.entries(p.params).map(([k, v]) => `${k} ${v}`).join(" ｜ "))}</p>`
     : "";
+  const warnings = Array.isArray(p.warnings) && p.warnings.length
+    ? `<p class="pack-timeline warn">⚠ 时间轴校验未通过：${esc(p.warnings.join("；"))}</p>`
+    : "";
+  const continuity = `
+    <p class="pack-notes"><b>复刻衔接建议：</b>各段提示词已统一主体/场景/光线/风格并带"延续上一段"衔接句。实际生成时请用<b>图生视频链条</b>保证连贯：第 1 段用参考图或文生视频生成，取它的<b>最后一帧</b>作为第 2 段的首帧图（可灵/即梦均支持首帧图生视频），依次接续；或用可灵<b>首尾帧</b>控制（首帧=上一段末帧）。全程用同一模型，不要中途换工具。</p>`;
   return `
     <div class="pack">
-      <p class="pack-title">提示词包 · 已按生成工具改写</p>
-      ${rows
-        .filter(([, v]) => v)
-        .map(
-          ([label, v]) => `
+      <p class="pack-title">提示词包 · 按模型分段（可直接粘贴）</p>
+      ${timelineLine(segments)}
+      ${warnings}
+      ${blocks}
+      ${p.negative ? `
         <div class="pack-row">
-          <span class="pack-label">${esc(label)}</span>
-          <pre class="pack-pre">${esc(v)}</pre>
-          <button class="btn btn-ghost btn-sm" data-act="copy" data-text="${escAttr(v)}">复制</button>
-        </div>`
-        )
-        .join("")}
+          <span class="pack-label">负向提示词</span>
+          <pre class="pack-pre clamp1" title="${escAttr(p.negative)}">${esc(p.negative)}</pre>
+          ${copyBtn(p.negative, "复制")}
+        </div>` : ""}
       ${params}
+      ${continuity}
     </div>`;
 }
 
@@ -470,10 +566,6 @@ document.addEventListener("click", (ev) => {
   if (btn.dataset.act === "del") doDelete(btn);
 });
 
-function openUrl(url) {
-  if (url) window.open(url, "_blank", "noopener");
-}
-
 $("#hooks-search").addEventListener("submit", (ev) => { ev.preventDefault(); loadLib("hooks"); });
 $("#prompts-search").addEventListener("submit", (ev) => { ev.preventDefault(); loadLib("prompts"); });
 
@@ -493,7 +585,7 @@ async function loadHistory() {
   list.hidden = reports.length === 0;
   for (const r of reports) {
     const div = document.createElement("div");
-    div.className = "lib-item";
+    div.className = "lib-item is-openable"; // 历史报告卡片整卡可点，保留 pointer 光标
     div.innerHTML = `
       <p class="lib-item-meta">${esc(r.date || "")}</p>
       <p class="lib-item-title">${esc(r.name.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/\.md$/, ""))}</p>`;
