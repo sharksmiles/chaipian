@@ -55,9 +55,14 @@
             <span class="field-label">Whisper 模型</span>
             <select id="whisper-model">
               <option value="tiny">tiny · 最快</option>
-              <option value="small" selected>small · 推荐</option>
-              <option value="medium">medium · 最准</option>
+              <option value="small">small · 快</option>
+              <option value="medium" selected>medium · 推荐（更准）</option>
+              <option value="large-v3">large-v3 · 最准（慢）</option>
             </select>
+          </label>
+          <label class="field" id="vision-model-field" hidden>
+            <span class="field-label">视觉模型</span>
+            <select id="vision-model"></select>
           </label>
           <label class="field field-check">
             <input type="checkbox" id="vision" checked>

@@ -66,8 +66,8 @@ button { font-family: inherit; }
 
 /* ── 主布局 ───────────────────────── */
 .layout {
-  display: grid; grid-template-columns: 330px 1fr;
-  max-width: 1280px; margin: 0 auto; min-height: calc(100vh - 152px);
+  display: grid; grid-template-columns: 400px 1fr;
+  max-width: 1360px; margin: 0 auto; min-height: calc(100vh - 152px);
 }
 .rail { border-right: 1px solid var(--line); padding: 26px 26px 20px; display: flex; flex-direction: column; gap: 30px; }
 .rail-section { animation: rise .55s cubic-bezier(.22,1,.36,1) .08s both; }

@@ -41,7 +41,10 @@ def _transcribe_local(audio_path, model_size, language):
             "或改用 --engine api 走云端 ASR"
         ) from e
     print(f"   （本地 Whisper 模型 {model_size}，首次运行会自动下载，请稍候…）", file=sys.stderr)
-    model = WhisperModel(model_size, device="cpu", compute_type="int8")
+    # 模型下载到项目内 work/models（不依赖系统 ~/.cache 权限，换机/沙箱环境也能用）
+    model_dir = pathlib.Path(__file__).resolve().parent.parent / "work" / "models"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    model = WhisperModel(model_size, device="cpu", compute_type="int8", download_root=str(model_dir))
     segments, _info = model.transcribe(
         str(audio_path),
         language=language,

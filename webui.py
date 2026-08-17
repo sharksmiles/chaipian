@@ -17,7 +17,7 @@ sys.path.insert(0, str(_ROOT))
 import breakdown  # noqa: F401,E402  vendor 注入 + UTF-8 输出
 
 from breakdown import library as lib  # noqa: E402
-from breakdown.config import save_cookiefile  # noqa: E402
+from breakdown.config import save_cookiefile, save_vision_active  # noqa: E402
 from breakdown.mdhtml import md_to_html  # noqa: E402
 from breakdown.service import config_snapshot, run_pipeline  # noqa: E402
 
@@ -185,6 +185,14 @@ class Handler(BaseHTTPRequestHandler):
             body = self._read_body()
             saved = save_cookiefile((body or {}).get("path") or "")
             return self._json(200, {"ok": True, "path": saved})
+        if path == "/api/vision":
+            body = self._read_body()
+            name = (body or {}).get("active") or ""
+            try:
+                saved = save_vision_active(name)
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+            return self._json(200, {"ok": True, "active": saved})
         if path == "/api/rewrite":
             from breakdown.rewrite import rewrite_prompts
 

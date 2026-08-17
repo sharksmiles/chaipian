@@ -45,6 +45,7 @@ async function initCfg() {
     const c = await api("/api/config");
     const issues = [];
     if (!c.llm_configured) issues.push("未配置 LLM Key");
+    setupVisionPresets(c);
     if (!c.vision_available) {
       issues.push("未配置视觉模型");
       $("#vision").checked = false;
@@ -54,6 +55,8 @@ async function initCfg() {
     const dot = $("#cfg-dot");
     const tx = $("#cfg-text");
     if (c.cookiefile) $("#cookies-file").value = c.cookiefile;
+    if (c.whisper_model) $("#whisper-model").value = c.whisper_model;
+    if (c.transcribe_engine) $("#engine").value = c.transcribe_engine;
     if (issues.length) {
       dot.classList.add("amber");
       tx.textContent = issues.join(" / ");
@@ -66,6 +69,41 @@ async function initCfg() {
   } catch (e) {
     $("#cfg-text").textContent = "配置读取失败：" + e.message;
   }
+}
+
+/* ── 视觉模型预设切换 ─────────────── */
+function setupVisionPresets(c) {
+  const field = $("#vision-model-field");
+  const sel = $("#vision-model");
+  const presets = c.vision_presets || [];
+  if (!presets.length) {
+    field.hidden = true;
+    return;
+  }
+  sel.innerHTML = "";
+  for (const p of presets) {
+    const opt = document.createElement("option");
+    opt.value = p.name;
+    opt.textContent = p.name;
+    if (p.model && p.model !== p.name) opt.textContent += ` · ${p.model}`;
+    sel.appendChild(opt);
+  }
+  sel.value = c.vision_active || presets[0].name;
+  field.hidden = false;
+  sel.addEventListener("change", async () => {
+    try {
+      await api("/api/vision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: sel.value }),
+      });
+      logLine(`🔄 视觉模型已切换：${sel.value}`, "l-warn");
+      initCfg();
+    } catch (e) {
+      logLine("❌ 切换视觉模型失败：" + e.message, "l-err");
+      initCfg();
+    }
+  });
 }
 
 /* ── 拆解任务 ─────────────────────── */

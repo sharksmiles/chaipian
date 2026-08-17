@@ -62,7 +62,7 @@ def build_parser():
     a = sub.add_parser("analyze", help="拆解一条视频（默认命令，可省略）")
     a.add_argument("url", help="视频链接（B站 / YouTube / 抖音 / 快手 / 小红书等 yt-dlp 支持的站点），或本地视频/音频文件路径")
     a.add_argument("--engine", choices=["local", "api"], default=None, help="转写引擎：local=faster-whisper 本地免费（默认），api=OpenAI 兼容 ASR 接口")
-    a.add_argument("--whisper-model", default="small", help="本地 Whisper 模型：tiny/base/small/medium（默认 small，中文口播建议 small 及以上）")
+    a.add_argument("--whisper-model", default=None, help="本地 Whisper 模型：tiny/base/small/medium/large-v3（默认取 config.json 的 transcribe.whisper_model）")
     a.add_argument("--lang", default="zh", help="转写语言（默认 zh）")
     a.add_argument("--cookies-from-browser", default=None, help="浏览器 cookies（chrome/edge/firefox），新版 Chrome/Edge 可能解密失败，优先用 --cookies-file")
     a.add_argument("--cookies-file", default=None, help="Netscape 格式 cookies.txt 路径（推荐：浏览器扩展 Get cookies.txt LOCALLY 导出）")

@@ -72,12 +72,13 @@ python main.py config
 }
 ```
 
-- 需要**支持图像输入**的模型：gpt-4o / gpt-4o-mini、豆包视觉系列（火山方舟 `doubao-1.5-vision-pro`）、智谱 `glm-4v`、通义 `qwen-vl-plus` 等；**DeepSeek 纯文本不支持**；
+- 需要**支持图像输入**的模型：gpt-4o / gpt-4o-mini、豆包视觉系列（火山方舟 `doubao-seed-1.6-vision` / `doubao-1.5-vision-pro`）、智谱 `glm-4v-flash`（免费）/ `glm-4.6v`（旗舰）、通义 `qwen-vl-plus` 等；**DeepSeek 纯文本不支持**；
+- **多模型一键切换**：`config.json` 的 `vision.presets` 里可配置多个视觉模型，`vision.active` 指定当前生效的预设；Web 页面"高级选项 → 视觉模型"下拉框可直接切换（写回 config.json）。预设切换后，下次拆解生效；
 - 启用后会自动下载带画面的视频并抽帧（PyAV 解码，无需安装 ffmpeg），报告新增第 12 节"画面提示词反推"：整体文生视频提示词（中英）、分镜提示词表、风格关键词、图生视频模板、复刻建议；
 - 反推结果同时存入 `library/prompts.jsonl`，`python main.py prompts <关键词>` 可检索；
 - 不想要时：删掉 vision.model 或加 `--no-vision`。
 
-首次运行本地转写会自动下载 Whisper 模型（small 约 460MB），之后离线可用。
+首次运行本地转写会自动下载 Whisper 模型（small 约 460MB / medium 约 1.5GB / large-v3 约 3GB），之后离线可用。默认模型取 `config.json` 的 `transcribe.whisper_model`（默认 medium，中文口播建议 medium 及以上；Web 页面高级选项可即时切换）。
 
 ## 产出
 

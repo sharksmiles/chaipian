@@ -34,7 +34,7 @@ def run_pipeline(url, cfg=None, opts=None, on_progress=None, stop_event=None):
     vision_configured = bool((cfg.get("vision") or {}).get("model"))
     vision_on = vision_configured and bool(opts.get("vision", True))
     engine = opts.get("engine") or None
-    whisper_model = opts.get("whisper_model") or "small"
+    whisper_model = opts.get("whisper_model") or (cfg.get("transcribe") or {}).get("whisper_model") or "small"
     lang = opts.get("lang") or "zh"
     cookies = opts.get("cookies_from_browser")
     cookies_file = opts.get("cookies_file") or (cfg.get("download") or {}).get("cookiefile") or None
@@ -105,11 +105,19 @@ def config_snapshot():
     cfg = load_config()
     vision = cfg.get("vision") or {}
     llm = cfg.get("llm") or {}
+    presets = vision.get("presets") or {}
+    vision_model = vision.get("model", "")
+    vision_key = (vision.get("api_key") or "").strip()
     return {
         "llm_configured": llm_key_ready(cfg),
         "llm_model": llm.get("model", ""),
-        "vision_available": bool(vision.get("model")),
-        "vision_model": vision.get("model", ""),
+        "vision_available": bool(vision_model) and bool(vision_key),
+        "vision_model": vision_model,
+        "vision_active": vision.get("active", ""),
+        "vision_presets": [
+            {"name": name, "model": (p or {}).get("model", "")}
+            for name, p in presets.items()
+        ],
         "transcribe_engine": (cfg.get("transcribe") or {}).get("engine", "local"),
         "whisper_model": (cfg.get("transcribe") or {}).get("whisper_model", "small"),
         "cookiefile": (cfg.get("download") or {}).get("cookiefile", ""),
