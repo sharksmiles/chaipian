@@ -136,7 +136,19 @@ $("#analyze-form").addEventListener("submit", async (ev) => {
       }).catch(() => {});
     }
     let job_id;
-    if (file) {
+    if (file && isImageFile(file.name)) {
+      // 单图六维反推：上传图片 → 一次视觉调用 → 直接展示结果
+      logLine(`🖼 单图反推：上传 ${file.name}…`, "l-warn");
+      const d = await api("/api/analyze-image?name=" + encodeURIComponent(file.name), {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: file,
+      });
+      logLine("✅ 单图反推完成", "l-done");
+      showSingleResult(d.result);
+      resetBtns();
+      return;
+    } else if (file) {
       const params = new URLSearchParams({
         name: file.name,
         engine: $("#engine").value,
@@ -225,6 +237,50 @@ function showReport(report) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"];
+
+function isImageFile(name) {
+  const i = String(name).lastIndexOf(".");
+  return i >= 0 && IMAGE_EXTS.includes(String(name).slice(i).toLowerCase());
+}
+
+function showSingleResult(r) {
+  $("#work-empty").hidden = true;
+  const el = $("#report");
+  const qp = (r && r.quick_prompt && (r.quick_prompt.zh || r.quick_prompt.en)) || "";
+  const escJson = (v) => esc(v == null ? "" : (typeof v === "string" ? v : JSON.stringify(v, null, 2)));
+  const blocks = [];
+  for (const [label, key] of [
+    ["主体", "subject"], ["环境", "environment"], ["镜头语言", "camera"],
+    ["光影", "lighting"], ["美术风格", "style"], ["氛围情绪", "mood"],
+  ]) {
+    const b = (r && r[key]) || {};
+    const rows = Object.entries(b)
+      .filter(([, v]) => v != null && v !== "")
+      .map(([k, v]) => `<tr><td><b>${esc(k)}</b></td><td>${esc(v)}</td></tr>`)
+      .join("");
+    if (rows) blocks.push(`<h3>${label}</h3><table>${rows}</table>`);
+  }
+  const neg = (r && r.negative_prompt) || "";
+  const params = (r && r.params) || {};
+  const paramLine = Object.entries(params)
+    .filter(([, v]) => v != null && v !== "")
+    .map(([k, v]) => `${esc(k)} ${esc(v)}`)
+    .join(" ｜ ");
+  el.innerHTML = `
+    <h2>🖼 单图六维反推结果</h2>
+    ${qp ? `<p><b>📌 快速提示词（可直接粘贴）</b></p><pre>${esc(qp)}</pre>` : ""}
+    ${r && r.description_zh ? `<p><b>画面深度描述</b></p><p>${esc(r.description_zh)}</p>` : ""}
+    ${blocks.join("")}
+    ${neg ? `<p><b>🚫 负面提示词</b>　${esc(neg)}</p>` : ""}
+    ${paramLine ? `<p><b>🔧 参数建议</b>　${paramLine}</p>` : ""}
+    ${r && r.recreate_notes ? `<p><b>💡 复刻建议</b>　${esc(r.recreate_notes)}</p>` : ""}
+    ${r ? `<details><summary>查看原始 JSON</summary><pre>${escJson(r)}</pre></details>` : ""}`;
+  el.hidden = false;
+  document.title = "单图反推 · 拆片";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 /* ── 标签切换 ─────────────────────── */
 $$(".tab").forEach((t) =>
   t.addEventListener("click", () => switchTab(t.dataset.tab))
@@ -301,6 +357,8 @@ function renderPrompts(items, list) {
       <p class="lib-item-title">${esc(r.title || "未命名")}</p>
       <p class="lib-item-meta">${esc(r.date)} · ${esc(r.platform || "")} · ${esc(r.url || "")}</p>
       <p class="lib-item-line"><b>类型判断</b>　${esc(r.video_type || "-")}</p>
+      ${(r.quick_zh || r.quick_en) ? `<p class="lib-item-line"><b>快速提示词</b>　${esc(r.quick_zh || r.quick_en)}</p>` : ""}
+      ${r.negative_prompt ? `<p class="lib-item-line"><b>负面提示词</b>　${esc(r.negative_prompt)}</p>` : ""}
       ${r.overall_zh ? `<p class="lib-item-line"><b>整体提示词(ZH)</b>　${esc(r.overall_zh)}</p>` : ""}
       ${kws ? `<p class="lib-item-line"><b>风格</b>　${kws}</p>` : ""}
       ${r.recreate_notes ? `<p class="lib-item-line"><b>复刻建议</b>　${esc(r.recreate_notes)}</p>` : ""}

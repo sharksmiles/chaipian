@@ -20,9 +20,68 @@ API_KEY_HINT = (
     "   可用 OpenAI 兼容接口：DeepSeek(https://api.deepseek.com/v1) ｜ 火山方舟豆包(https://ark.cn-beijing.volces.com/api/v3) ｜ 智谱(https://open.bigmodel.cn/api/paas/v4)"
 )
 
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
+
+
+def _is_image_file(path):
+    try:
+        return path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
+    except OSError:
+        return False
+
+
+def cmd_analyze_image(args, cfg):
+    """单图深度反推（截图/封面 → 六维分析 + AI 生成提示词），不转写、不入库"""
+    from breakdown.vision import analyze_single_image
+
+    vision = cfg.get("vision") or {}
+    if not vision.get("model"):
+        print(
+            "❌ 未启用画面提示词反推：config.json 中 vision.model 为空（需支持图像的模型，如 gpt-4o / doubao-vision / glm-4.6v）",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    path = pathlib.Path(args.url)
+    meta = {"url": str(path.resolve()), "title": path.name, "platform": "本地图片", "duration": 0}
+    print("🖼 单图深度反推（六维分析）…", file=sys.stderr)
+    result = analyze_single_image(path, meta, cfg)
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    qp = result.get("quick_prompt") or {}
+    print("══════ 单图六维反推结果 ══════")
+    if qp.get("zh") or qp.get("en"):
+        print(f"📌 快速提示词（可直接粘贴）：\n  {qp.get('zh') or qp.get('en')}\n")
+    if result.get("description_zh"):
+        print(f"【画面深度描述】\n{result['description_zh']}\n")
+    for label, key in (
+        ("主体", "subject"), ("环境", "environment"), ("镜头语言", "camera"),
+        ("光影", "lighting"), ("美术风格", "style"), ("氛围情绪", "mood"),
+    ):
+        block = result.get(key)
+        if isinstance(block, dict):
+            print(f"【{label}】")
+            for k, v in block.items():
+                if v:
+                    print(f"  · {k}：{v}")
+            print()
+    neg = result.get("negative_prompt") or ""
+    if neg:
+        print(f"🚫 负面提示词：{neg}")
+    params = result.get("params")
+    if isinstance(params, dict) and any(params.values()):
+        print("🔧 参数建议：" + " ｜ ".join(f"{k} {v}" for k, v in params.items() if v))
+    notes = result.get("recreate_notes") or ""
+    if notes:
+        print(f"💡 复刻建议：{notes}")
+    print("════════════════════════════")
+
 
 def cmd_analyze(args):
     cfg = load_config()
+    if _is_image_file(pathlib.Path(args.url)):
+        cmd_analyze_image(args, cfg)
+        return
     if not llm_key_ready(cfg):
         print(API_KEY_HINT, file=sys.stderr)
         sys.exit(2)
@@ -60,7 +119,7 @@ def build_parser():
     sub = p.add_subparsers(dest="cmd")
 
     a = sub.add_parser("analyze", help="拆解一条视频（默认命令，可省略）")
-    a.add_argument("url", help="视频链接（B站 / YouTube / 抖音 / 快手 / 小红书等 yt-dlp 支持的站点），或本地视频/音频文件路径")
+    a.add_argument("url", help="视频链接（B站 / YouTube / 抖音 / 快手 / 小红书等 yt-dlp 支持的站点），或本地视频/音频/图片文件路径（图片走单图六维反推）")
     a.add_argument("--engine", choices=["local", "api"], default=None, help="转写引擎：local=faster-whisper 本地免费（默认），api=OpenAI 兼容 ASR 接口")
     a.add_argument("--whisper-model", default=None, help="本地 Whisper 模型：tiny/base/small/medium/large-v3（默认取 config.json 的 transcribe.whisper_model）")
     a.add_argument("--lang", default="zh", help="转写语言（默认 zh）")
@@ -116,6 +175,12 @@ def main():
         for r in results:
             print(f"── {r['date']} ｜ {r['title'][:30]} ｜ {r['platform']}")
             print(f"   类型判断：{r.get('video_type') or '-'}")
+            quick = r.get("quick_zh") or r.get("quick_en") or ""
+            if quick:
+                print(f"   快速提示词：{quick[:80]}")
+            neg = r.get("negative_prompt") or ""
+            if neg:
+                print(f"   负面提示词：{neg[:120]}")
             print(f"   整体提示词(ZH)：{r.get('overall_zh') or '-'}")
             print(f"   整体提示词(EN)：{r.get('overall_en') or '-'}")
             kws = r.get("style_keywords") or []

@@ -1,6 +1,12 @@
-"""探测智谱可用的视觉模型：用小图调 chat/completions，返回 200 即可用"""
+"""探测智谱可用的视觉模型：用小图调 chat/completions，返回 200 即可用
+
+API Key 来源（按优先级）：环境变量 ZHIPU_API_KEY → config.json 的 vision.api_key（本地文件，已 gitignore）。
+禁止在脚本里硬编码 Key。
+"""
 import base64
 import json
+import os
+import pathlib
 import sys
 import urllib.request
 
@@ -9,14 +15,32 @@ try:
 except Exception:  # noqa: BLE001
     pass
 
-KEY = "3bde125150dc4c22854b50bda5684554.xpvEXen1fOGTxbvP"
+
+def _load_key():
+    key = os.environ.get("ZHIPU_API_KEY", "").strip()
+    if key:
+        return key
+    cfg_path = pathlib.Path(__file__).resolve().parent.parent / "config.json"
+    try:
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        key = ((cfg.get("vision") or {}).get("api_key") or "").strip()
+    except Exception:  # noqa: BLE001
+        key = ""
+    return key
+
+
+KEY = _load_key()
+if not KEY:
+    print("未找到智谱 API Key：请设置环境变量 ZHIPU_API_KEY，或在 config.json 的 vision.api_key 中填写。")
+    sys.exit(1)
+
 URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
 # 1x1 红色 PNG
 PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 
 CANDIDATES = [
-    "glm-4v-flash", "glm-4v-plus", "glm-4v-plus-0111",
+    "glm-4v-plus", "glm-4v-plus-0111",
     "glm-4.5v", "glm-4.6v", "glm-4.7v", "glm-5v",
 ]
 

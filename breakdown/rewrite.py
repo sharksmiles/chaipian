@@ -18,7 +18,7 @@ SYSTEM = """你是短视频 AI 生成提示词改写专家。用户给你一段"
   "negative": "负向提示词（不要出现的内容，逗号分隔）",
   "params": {"时长建议": "5-8秒", "运动强度": "低/中/高", "首帧建议": "首帧构图要点"}
 }
-规则：画面细节以原始提示词为准，不要自行添加不存在的元素；Seedance 部分镜头语言要具体（如：特写→中景推进、俯视 10°、镜头跟随主体左移），但不要编造原始画面没有的内容；只输出 JSON。"""
+规则：画面细节以原始提示词为准，不要自行添加不存在的元素；Seedance 部分镜头语言要具体（如：特写→中景推进、俯视 10°、镜头跟随主体左移），但不要编造原始画面没有的内容；若用户提供了"原始负面提示词"，negative 字段以它为主并补充完善，不要丢弃；只输出 JSON。"""
 
 
 def rewrite_prompts(record, cfg=None):
@@ -38,9 +38,13 @@ def rewrite_prompts(record, cfg=None):
     if not zh and not en:
         raise RuntimeError("该记录没有可改写的中英文整体提示词，先重新跑一次带视觉反推的拆解")
 
+    quick = (record.get("quick_zh") or record.get("quick_en") or "").strip()
+    neg = (record.get("negative_prompt") or "").strip()
     user = (
         "原始反推提示词（中文）：" + (zh or "（无）") + "\n"
         "原始反推提示词（英文）：" + (en or "（无）") + "\n"
+        "快速提示词：" + (quick or "（无）") + "\n"
+        "原始负面提示词：" + (neg or "（无）") + "\n"
         "图生视频模板：" + (img2vid or "（无）") + "\n\n"
         "请按规则改写成可直接粘贴的提示词包。"
     )

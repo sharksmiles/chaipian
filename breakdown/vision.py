@@ -26,8 +26,8 @@ VISION_SYSTEM = (
 
 MERGE_SYSTEM = """你是视频分镜合并专家。同一视频按时间段分批反推了分镜结果（每片的时间已是全局绝对秒），
 请合并成一份完整结果：把所有分镜按时间排序、合并内容重复或相邻的镜头、重新编号（时间保持绝对秒，格式如 "12-15s"），
-并汇总：整体文生视频提示词（中文 zh / 英文 en，各 60-120 字）、风格关键词列表（去重）。
-只输出 JSON，结构：{"video_type": "", "overall_prompt": {"zh": "", "en": ""}, "scene_prompts": [{"time": "12-15s", "visual": "", "prompt_zh": "", "prompt_en": "", "camera": "", "style": ""}], "style_keywords": [], "image_to_video_prompt": "", "recreate_notes": ""}
+并汇总：整体文生视频提示词（中文 zh / 英文 en，各 60-120 字）、一行快速提示词 quick_prompt（中英各一行，≤60字，可直接粘贴，取覆盖最全且最精炼的一版）、负面提示词 negative_prompt（逗号分隔，跨片去重合并）、风格关键词列表（去重）。
+只输出 JSON，结构：{"video_type": "", "quick_prompt": {"zh": "", "en": ""}, "negative_prompt": "", "overall_prompt": {"zh": "", "en": ""}, "scene_prompts": [{"time": "12-15s", "visual": "", "prompt_zh": "", "prompt_en": "", "camera": "", "style": ""}], "style_keywords": [], "image_to_video_prompt": "", "recreate_notes": ""}
 分镜数量多时也要全部保留，不要省略。"""
 
 
@@ -268,7 +268,7 @@ def analyze_vision(meta, lines, video_path, cfg, max_frames=None):
     llm = cfg.get("llm") or {}
     model = vision.get("model") or ""
     if not model:
-        raise RuntimeError("未启用画面提示词反推：config.json 中 vision.model 为空（需要支持图像的模型，如 gpt-4o / doubao-vision / glm-4v）")
+        raise RuntimeError("未启用画面提示词反推：config.json 中 vision.model 为空（需要支持图像的模型，如 gpt-4o / doubao-vision / glm-4.6v）")
     api_key = vision.get("api_key") or llm.get("api_key")
     base_url = vision.get("base_url") or llm.get("base_url") or None
     if not api_key:
@@ -351,6 +351,8 @@ def analyze_vision(meta, lines, video_path, cfg, max_frames=None):
     merged.setdefault("style_keywords", [])
     merged.setdefault("image_to_video_prompt", "")
     merged.setdefault("recreate_notes", "")
+    merged.setdefault("quick_prompt", {"zh": "", "en": ""})
+    merged.setdefault("negative_prompt", "")
     merged["_frame_count"] = len(slices) * frames_per_slice
     merged["_slice_count"] = len(slices)
 
@@ -384,12 +386,55 @@ def _fallback_merge(slices):
     first = slices[0]["result"]
     return {
         "video_type": first.get("video_type", ""),
+        "quick_prompt": first.get("quick_prompt", {"zh": "", "en": ""}),
+        "negative_prompt": first.get("negative_prompt", ""),
         "overall_prompt": first.get("overall_prompt", {"zh": "", "en": ""}),
         "scene_prompts": scenes,
         "style_keywords": first.get("style_keywords", []),
         "image_to_video_prompt": first.get("image_to_video_prompt", ""),
         "recreate_notes": first.get("recreate_notes", ""),
     }
+
+
+def analyze_single_image(image_path, meta, cfg, max_tokens=None):
+    """单图/单帧深度反推：一张截图/封面 → 六维分析 JSON。
+
+    高频场景：看到爆款封面/精彩单镜头，快速反推"这张画面用 AI 怎么生成"。
+    与 analyze_vision（整视频分片分帧）不同：只分析一张图，一次调用。
+    """
+    from openai import OpenAI
+    from PIL import Image
+
+    vision = cfg.get("vision") or {}
+    llm = cfg.get("llm") or {}
+    model = vision.get("model") or ""
+    if not model:
+        raise RuntimeError("未启用画面提示词反推：config.json 中 vision.model 为空（需要支持图像的模型，如 gpt-4o / doubao-vision / glm-4.6v）")
+    api_key = vision.get("api_key") or llm.get("api_key")
+    base_url = vision.get("base_url") or llm.get("base_url") or None
+    if not api_key:
+        raise RuntimeError("vision.api_key 未配置（可复用 llm.api_key）")
+    max_tokens = int(max_tokens or vision.get("max_tokens") or 2500)
+
+    from .prompt import build_single_vision_messages
+
+    sys_prompt, user_parts = build_single_vision_messages(meta, 1)
+
+    img = Image.open(image_path).convert("RGB")
+    img.thumbnail((640, 640))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=85)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    client = OpenAI(base_url=base_url, api_key=api_key, timeout=600)
+    data = _call_vision(client, model, max_tokens, sys_prompt, user_parts, [b64], "单图反推")
+
+    data.setdefault("quick_prompt", {"zh": "", "en": ""})
+    data.setdefault("negative_prompt", "")
+    data.setdefault("recreate_notes", "")
+    data.setdefault("params", {})
+    data["_frame_count"] = 1
+    return data
 
 
 def _parse_json(text):

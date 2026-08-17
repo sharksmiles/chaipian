@@ -9,7 +9,7 @@
 - **支持上传本地视频/音频文件直接拆解**（Web 页面上传，或 CLI 直接传文件路径；跳过下载步骤，自动探测时长）
 - 本地 faster-whisper 转写（免费）或 OpenAI 兼容 ASR 接口
 - 任意 OpenAI 兼容 LLM（DeepSeek / 豆包 / 智谱 / OpenAI）按"七维拆解模型"输出结构化 JSON
-- **画面提示词反推（可选）**：抽关键帧 + 多模态视觉模型，反推"这条视频用 AI 怎么生成"的文生视频/图生视频提示词（分镜级）
+- **画面提示词反推（可选）**：抽关键帧 + 多模态视觉模型，反推"这条视频用 AI 怎么生成"的文生视频/图生视频提示词（分镜级）；另支持**单图六维反推**——上传一张截图/封面，快速分析主体/环境/镜头/光影/风格/氛围，输出可直接粘贴的 AI 生成提示词
 - 自动生成 Markdown 拆解报告（对齐人工模板的 11 个模块 + 提示词反推第 12 节）
 - 自动沉淀 `library/index.csv`（与《爆款视频拆解表.csv》同字段，可直接 Excel 打开）、`library/hooks.jsonl`（钩子公式库）和 `library/prompts.jsonl`（提示词库），均支持检索
 
@@ -43,6 +43,9 @@ python webui.py --port 9000 --no-open
 python main.py "https://www.bilibili.com/video/BVxxxxxx"
 python main.py "D:\videos\sample.mp4"
 
+# 单图六维反推（截图/封面 → 主体/镜头/光影/风格等六维分析 + AI 生成提示词，约 30 秒出结果）
+python main.py "D:\images\cover.jpg"
+
 # 指定转写引擎与 Whisper 模型（tiny/base/small/medium）
 python main.py analyze "https://www.youtube.com/watch?v=xxxx" --engine local --whisper-model small
 
@@ -72,7 +75,7 @@ python main.py config
 }
 ```
 
-- 需要**支持图像输入**的模型：gpt-4o / gpt-4o-mini、豆包视觉系列（火山方舟 `doubao-seed-1.6-vision` / `doubao-1.5-vision-pro`）、智谱 `glm-4v-flash`（免费）/ `glm-4.6v`（旗舰）、通义 `qwen-vl-plus` 等；**DeepSeek 纯文本不支持**；
+- 需要**支持图像输入**的模型：gpt-4o / gpt-4o-mini、豆包视觉系列（火山方舟 `doubao-seed-1.6-vision` / `doubao-1.5-vision-pro`）、智谱 `glm-4.6v`（旗舰）、通义 `qwen-vl-plus` 等；**DeepSeek 纯文本不支持**；
 - **多模型一键切换**：`config.json` 的 `vision.presets` 里可配置多个视觉模型，`vision.active` 指定当前生效的预设；Web 页面"高级选项 → 视觉模型"下拉框可直接切换（写回 config.json）。预设切换后，下次拆解生效；
 - 启用后会自动下载带画面的视频并抽帧（PyAV 解码，无需安装 ffmpeg），报告新增第 12 节"画面提示词反推"：整体文生视频提示词（中英）、分镜提示词表、风格关键词、图生视频模板、复刻建议；
 - 反推结果同时存入 `library/prompts.jsonl`，`python main.py prompts <关键词>` 可检索；

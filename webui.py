@@ -32,6 +32,9 @@ _UPLOAD_SUFFIXES = {
     ".mp3", ".m4a", ".wav", ".aac", ".ogg", ".flac", ".opus", ".wma",
 }
 
+# 单图反推支持的图片扩展名
+_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
+
 
 def start_job(url, opts):
     with JOBS_LOCK:
@@ -181,6 +184,28 @@ class Handler(BaseHTTPRequestHandler):
             }
             jid = start_job(str(dest), opts)
             return self._json(200, {"job_id": jid, "name": dest.name})
+        if path == "/api/analyze-image":
+            from breakdown.vision import analyze_single_image
+
+            name = (_q(self.path, "name") or "").strip()
+            if not name or "/" in name or "\\" in name or name.startswith("."):
+                return self._json(400, {"error": "非法的文件名"})
+            ext = pathlib.Path(name).suffix.lower()
+            if ext not in _IMAGE_SUFFIXES:
+                return self._json(400, {"error": f"请上传图片文件（{', '.join(sorted(_IMAGE_SUFFIXES))}）"})
+            try:
+                dest = _save_upload(self, name)
+            except Exception as e:  # noqa: BLE001
+                return self._json(400, {"error": f"保存上传文件失败：{e}"})
+            try:
+                from breakdown.config import load_config
+
+                cfg = load_config()
+                meta = {"url": str(dest), "title": dest.name, "platform": "本地图片", "duration": 0}
+                result = analyze_single_image(dest, meta, cfg)
+            except Exception as e:  # noqa: BLE001
+                return self._json(500, {"error": f"单图反推失败：{e}"})
+            return self._json(200, {"ok": True, "result": result})
         if path == "/api/cookiefile":
             body = self._read_body()
             saved = save_cookiefile((body or {}).get("path") or "")

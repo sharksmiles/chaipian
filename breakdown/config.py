@@ -22,11 +22,11 @@ DEFAULTS = {
         "openai_audio_model": "whisper-1",
     },
     "vision": {
-        "model": "",  # 填了即启用画面提示词反推（需支持图像的模型，如 gpt-4o / doubao-vision / glm-4v）
+        "model": "",  # 填了即启用画面提示词反推（需支持图像的模型，如 gpt-4o / doubao-vision / glm-4.6v）
         "base_url": "",
         "api_key": "",
         "max_frames": 8,  # 每 3 秒抽 1 帧（上限 8）：实测 glm-4.6v 在 8 帧+2500 tokens 内输出最稳，10 帧会截断 JSON
-        "max_tokens": 8192,  # 实测 glm-4.6v 上限 8192；2500 会截断输出导致 JSON 损坏；glm-4v-flash 硬上限 1024 需单独调小
+        "max_tokens": 8192,  # 实测 glm-4.6v 上限 8192；2500 会截断输出导致 JSON 损坏
         "frames_per_slice": 8,  # 分片分帧：每片帧数（长视频按片多次调用）
         "slice_seconds": 40,  # 分片分帧：每片时长（秒），超长视频自动分片反推再合并
         "max_slices": 8,  # 分片分帧：最多分片数（防超长视频费用失控），3 分钟视频约 5 片

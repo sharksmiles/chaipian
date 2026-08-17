@@ -147,6 +147,17 @@ def render_report(result, meta, lines, reports_dir):
     if isinstance(vp, dict) and vp:
         p.append("## 12. 画面提示词反推（AI 生成复刻用）\n")
         p.append(f"- **视频类型判断**：{_fmt(_g(vp, 'video_type'))}")
+        qzh = _fmt(_g(vp, "quick_prompt", "zh"))
+        qen = _fmt(_g(vp, "quick_prompt", "en"))
+        if qzh or qen:
+            p.append("\n**快速提示词（一行版，可直接粘贴）**：\n")
+            if qzh:
+                p.append(f"```text\n{qzh}\n```")
+            if qen:
+                p.append(f"```text\n{qen}\n```")
+        neg = _fmt(_g(vp, "negative_prompt"))
+        if neg:
+            p.append(f"\n**负面提示词**：{neg}")
         op = _g(vp, "overall_prompt")
         if isinstance(op, dict):
             p.append(f"\n**整体文生视频提示词（中文）**：\n\n```text\n{_fmt(_g(op, 'zh'))}\n```")

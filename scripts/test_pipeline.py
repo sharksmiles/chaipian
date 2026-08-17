@@ -55,15 +55,19 @@ class FakeCompletions:
         if "合并" in system:  # 分片合并调用（文本）
             sample = json.loads(json.dumps(VISION_OUTPUT_DEMO))
             sample["video_type"] = "AI生成（测试判断）"
+            sample["quick_prompt"] = {"zh": "测试快速提示词", "en": "Test quick prompt"}
+            sample["negative_prompt"] = "肢体形变, 闪烁"
             sample["overall_prompt"]["zh"] = "测试整体提示词"
             sample["scene_prompts"] = [
-                {"time": "0-3s", "visual": "特写", "prompt_zh": "P1", "prompt_en": "E1", "camera": "固定", "style": "自然"}
+                {"time": "0-3s", "visual": "特写", "prompt_zh": "P1", "prompt_en": "E1", "camera": "45°仰拍，中景，缓推", "style": "自然"}
             ]
             return FakeResp(json.dumps(sample, ensure_ascii=False))
         if isinstance(user, list):  # 视觉反推调用（含图）
             assert any(p.get("type") == "image_url" for p in user)
             sample = json.loads(json.dumps(VISION_OUTPUT_DEMO))
             sample["video_type"] = "AI生成（测试判断）"
+            sample["quick_prompt"] = {"zh": "测试快速提示词", "en": "Test quick prompt"}
+            sample["negative_prompt"] = "肢体形变, 闪烁"
             sample["overall_prompt"]["zh"] = "测试整体提示词"
             return FakeResp(json.dumps(sample, ensure_ascii=False))
         # 文本七维拆解调用
@@ -125,6 +129,8 @@ def main():
     assert "流水线测试视频" in text
     assert "一句话钩子公式" in text and "悬念提问 + 利益承诺" in text
     assert "画面提示词反推" in text and "测试整体提示词" in text
+    assert "快速提示词（一行版，可直接粘贴）" in text and "测试快速提示词" in text
+    assert "负面提示词" in text and "肢体形变" in text
     assert "[00:00-00:03] 大家好" in text
 
     csv_text = (LIB / "index.csv").read_text(encoding="utf-8-sig")
@@ -134,6 +140,8 @@ def main():
     assert hits and hits[0]["transfer_topic"] == "可迁移到我方哪个选题"
     phits = lib.search_prompts(LIB, "测试整体提示词")
     assert phits and phits[0]["video_type"] == "AI生成（测试判断）"
+    assert phits[0]["quick_zh"] == "测试快速提示词"
+    assert phits[0]["negative_prompt"] == "肢体形变, 闪烁"
 
     print("✅ 全链路通过（含提示词反推）：", report)
     print("✅ index.csv / hooks.jsonl / prompts.jsonl 均入库，检索 OK")
