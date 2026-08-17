@@ -48,8 +48,13 @@ def md_to_html(md):
             while i < n and not lines[i].startswith("```"):
                 buf.append(lines[i])
                 i += 1
-            i += 1  # 跳过结束 ``` 
-            out.append(f"<pre><code>{html.escape(chr(10).join(buf))}</code></pre>")
+            i += 1  # 跳过结束 ```
+            code = chr(10).join(buf)
+            out.append(
+                f'<div class="code-block"><button type="button" class="copy-btn" '
+                f'data-act="copy" data-text="{html.escape(code, quote=True)}">复制</button>'
+                f"<pre><code>{html.escape(code)}</code></pre></div>"
+            )
             continue
         # 标题
         m = re.match(r"^(#{1,6})\s+(.*)$", line)

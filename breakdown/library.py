@@ -149,7 +149,7 @@ def search_hooks(libdir, query=""):
 
 
 def append_prompt(result, meta, libdir):
-    """把反推的视频生成提示词存入 prompts.jsonl"""
+    """把反推的视频生成提示词存入 prompts.jsonl（与报告第 12 节内容保持一致，含全部分镜提示词）"""
     libdir = pathlib.Path(libdir)
     libdir.mkdir(parents=True, exist_ok=True)
     r = result if isinstance(result, dict) else {}
@@ -160,6 +160,20 @@ def append_prompt(result, meta, libdir):
     if not isinstance(op, dict):
         op = {}
     kws = _g(vp, "style_keywords")
+    scenes = []
+    for seg in _g(vp, "scene_prompts") or []:
+        if not isinstance(seg, dict):
+            continue
+        scenes.append(
+            {
+                "time": _g(seg, "time"),
+                "visual": _g(seg, "visual"),
+                "prompt_zh": _g(seg, "prompt_zh"),
+                "prompt_en": _g(seg, "prompt_en"),
+                "camera": _g(seg, "camera"),
+                "style": _g(seg, "style"),
+            }
+        )
     record = {
         "date": datetime.date.today().isoformat(),
         "url": meta["url"],
@@ -171,7 +185,8 @@ def append_prompt(result, meta, libdir):
         "negative_prompt": _g(vp, "negative_prompt"),
         "overall_zh": _g(op, "zh"),
         "overall_en": _g(op, "en"),
-        "scene_count": len(_g(vp, "scene_prompts") or []),
+        "scene_count": len(scenes),
+        "scene_prompts": scenes,
         "style_keywords": kws if isinstance(kws, list) else [],
         "image_to_video_prompt": _g(vp, "image_to_video_prompt"),
         "recreate_notes": _g(vp, "recreate_notes"),

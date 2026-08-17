@@ -183,6 +183,14 @@ def main():
                 print(f"   负面提示词：{neg[:120]}")
             print(f"   整体提示词(ZH)：{r.get('overall_zh') or '-'}")
             print(f"   整体提示词(EN)：{r.get('overall_en') or '-'}")
+            scenes = r.get("scene_prompts") or []
+            if scenes:
+                print(f"   分镜提示词（{len(scenes)} 镜）：")
+                for s in scenes:
+                    if isinstance(s, dict) and (s.get("prompt_zh") or "").strip():
+                        print(f"     [{s.get('time') or '?'}] {s.get('prompt_zh')}")
+            elif r.get("scene_count"):
+                print(f"   分镜提示词（{r['scene_count']} 镜）：旧版本记录未保存内容，重新拆解一次即可")
             kws = r.get("style_keywords") or []
             print(f"   风格关键词：{', '.join(kws[:8]) if kws else '-'}")
             print(f"   复刻建议：{(r.get('recreate_notes') or '-')[:120]} ｜ {r['url']}")
