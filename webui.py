@@ -214,6 +214,14 @@ class Handler(BaseHTTPRequestHandler):
                 if j:
                     j["stop"].set()
             return self._json(200, {"ok": True})
+        if path == "/api/library/delete":
+            body = self._read_body()
+            kind = (body or {}).get("kind") or ""
+            ids = (body or {}).get("ids") or []
+            if kind not in ("hooks", "prompts") or not isinstance(ids, list) or not ids:
+                return self._json(400, {"error": "参数错误：kind 需为 hooks 或 prompts，ids 为非空列表"})
+            removed = lib.delete_records(_lib_dir(), kind, ids)
+            return self._json(200, {"ok": True, "removed": removed})
         self._json(404, {"error": "not found"})
 
 

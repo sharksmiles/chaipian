@@ -280,8 +280,14 @@ function renderHooks(items, list) {
       <p class="lib-item-line"><b>一句话钩子</b>　${esc(r.hook_one_liner || "-")}</p>
       ${r.hook_formula ? `<p class="lib-item-line"><b>钩子公式</b>　${esc(r.hook_formula)}</p>` : ""}
       ${reuse.map((x) => `<p class="lib-item-line"><b>可复用</b>　${esc(x)}</p>`).join("")}
-      ${r.transfer_topic ? `<p class="lib-item-line"><b>可迁移</b>　${esc(r.transfer_topic)}</p>` : ""}`;
-    div.addEventListener("click", () => openUrl(r.url));
+      ${r.transfer_topic ? `<p class="lib-item-line"><b>可迁移</b>　${esc(r.transfer_topic)}</p>` : ""}
+      <p class="lib-item-actions">
+        <button class="btn btn-ghost btn-sm lib-del" data-act="del" data-kind="hooks" data-id="${escAttr(r.id || "")}">删除</button>
+      </p>`;
+    div.addEventListener("click", (ev) => {
+      if (ev.target.closest("button")) return;
+      openUrl(r.url);
+    });
     list.appendChild(div);
   }
 }
@@ -302,6 +308,7 @@ function renderPrompts(items, list) {
         <button class="btn btn-ghost btn-sm" data-act="rewrite" data-url="${escAttr(r.url || "")}">
           ${r.pack ? "重新改写提示词包" : "改写为可直接用的提示词包"}
         </button>
+        <button class="btn btn-ghost btn-sm lib-del" data-act="del" data-kind="prompts" data-id="${escAttr(r.id || "")}">删除</button>
       </p>
       ${r.pack ? packBlock(r.pack) : ""}`;
     div.addEventListener("click", (ev) => {
@@ -376,11 +383,31 @@ async function copyText(text, btn) {
   setTimeout(() => (btn.textContent = old), 1200);
 }
 
+async function doDelete(btn) {
+  const kind = btn.dataset.kind;
+  const id = btn.dataset.id;
+  if (!confirm(`确定删除这条${kind === "hooks" ? "钩子" : "提示词"}记录？\n（只删库记录，历史报告与汇总表不受影响）`)) return;
+  btn.disabled = true;
+  try {
+    const d = await api("/api/library/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, ids: [id] }),
+    });
+    logLine(`🗑 已删除 ${d.removed} 条${kind === "hooks" ? "钩子" : "提示词"}记录`, "l-warn");
+    await loadLib(kind);
+  } catch (e) {
+    btn.disabled = false;
+    logLine("❌ 删除失败：" + e.message, "l-err");
+  }
+}
+
 document.addEventListener("click", (ev) => {
   const btn = ev.target.closest("button[data-act]");
   if (!btn) return;
   if (btn.dataset.act === "rewrite") doRewrite(btn);
   if (btn.dataset.act === "copy") copyText(btn.dataset.text, btn);
+  if (btn.dataset.act === "del") doDelete(btn);
 });
 
 function openUrl(url) {

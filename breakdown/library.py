@@ -1,6 +1,7 @@
 """本地库：index.csv（与《爆款视频拆解表.csv》同字段）+ hooks.jsonl（钩子/公式库）"""
 import csv
 import datetime
+import hashlib
 import json
 import pathlib
 
@@ -119,21 +120,30 @@ def append_hook(result, meta, libdir):
         fp.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def _line_id(line):
+    """记录行指纹：用于前端定位/删除（稳定且不依赖行号）"""
+    return hashlib.md5(line.encode("utf-8")).hexdigest()[:12]
+
+
+def _read_lines(path):
+    """读 JSONL 文件，返回 (非空行列表, 原始文件内容是否以换行结尾)"""
+    if not path.exists():
+        return []
+    return [l for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+
+
 def search_hooks(libdir, query=""):
     path = pathlib.Path(libdir) / "hooks.jsonl"
     if not path.exists():
         return []
     query = (query or "").strip().lower()
     results = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rec = json.loads(line)
-        except Exception:  # noqa: BLE001
+    for line in reversed(_read_lines(path)):  # 最新拆解在前
+        rec = _parse_line(line)
+        if rec is None:
             continue
         if not query or query in json.dumps(rec, ensure_ascii=False).lower():
+            rec["id"] = _line_id(line)
             results.append(rec)
     return results
 
@@ -173,18 +183,50 @@ def search_prompts(libdir, query=""):
         return []
     query = (query or "").strip().lower()
     results = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rec = json.loads(line)
-        except Exception:  # noqa: BLE001
+    for line in reversed(_read_lines(path)):  # 最新拆解在前
+        rec = _parse_line(line)
+        if rec is None:
             continue
         if not query or query in json.dumps(rec, ensure_ascii=False).lower():
+            rec["id"] = _line_id(line)
             rec["pack"] = get_prompt_pack(libdir, rec.get("url", ""))
             results.append(rec)
     return results
+
+
+def _parse_line(line):
+    """解析单行 JSONL，失败返回 None（跳过坏行）"""
+    line = line.strip()
+    if not line:
+        return None
+    try:
+        return json.loads(line)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def delete_records(libdir, kind, ids):
+    """按记录 id（行指纹）删除 hooks/prompts 库记录，返回删除条数。
+
+    kind: "hooks" | "prompts"；ids: 行指纹列表（来自 search_* 返回的 rec["id"]）。
+    只删库记录，不动 index.csv 汇总表与 prompt_packs 改写包。
+    """
+    fname = "hooks.jsonl" if kind == "hooks" else "prompts.jsonl"
+    path = pathlib.Path(libdir) / fname
+    if not path.exists():
+        return 0
+    ids = set(ids or [])
+    kept = []
+    removed = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        if _line_id(line) in ids:
+            removed += 1
+            continue
+        kept.append(line)
+    path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+    return removed
 
 
 def get_prompt_pack(libdir, url):

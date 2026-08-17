@@ -225,7 +225,9 @@ button { font-family: inherit; }
 
 /* ── 提示词包（改写结果）────────────── */
 .btn-sm { padding: 4px 10px; font-size: 12px; }
-.lib-item-actions { margin-top: 6px; }
+.lib-item-actions { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+.lib-del { color: color-mix(in srgb, var(--warn) 80%, var(--ink-2)); }
+.lib-del:hover { background: color-mix(in srgb, var(--warn) 14%, var(--paper-2)); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
 .pack {
   margin-top: 10px; padding: 12px 14px; border: 1px dashed var(--line);
   background: color-mix(in srgb, var(--marker) 22%, var(--paper-2));
