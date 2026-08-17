@@ -74,6 +74,7 @@ def analyze_vision(meta, lines, video_path, cfg, max_frames=None):
         raise RuntimeError("vision.api_key 未配置（可复用 llm.api_key）")
 
     max_frames = max_frames or vision.get("max_frames") or 8
+    max_tokens = int(vision.get("max_tokens") or 2500)
     print(f"   （抽取关键帧：≤{max_frames} 张）", file=sys.stderr)
     frames = extract_frames(video_path, max_frames)
     if not frames:
@@ -96,7 +97,7 @@ def analyze_vision(meta, lines, video_path, cfg, max_frames=None):
                     {"role": "user", "content": content},
                 ],
                 temperature=0.3,
-                max_tokens=2500,
+                max_tokens=max_tokens,
             )
             text = resp.choices[0].message.content or ""
         except Exception as e:  # noqa: BLE001

@@ -25,6 +25,7 @@ DEFAULTS = {
         "base_url": "",
         "api_key": "",
         "max_frames": 8,
+        "max_tokens": 2500,  # 部分模型上限低（如智谱 glm-4v-flash 限 1024），按需调小
     },
     "paths": {
         "reports": "reports",

@@ -14,11 +14,12 @@
     "openai_audio_model": "whisper-1"
   },
   "vision": {
-    "_说明": "画面提示词反推：填了 model 即启用（分析时下载视频画面并抽帧）。需要支持图像的模型，如 gpt-4o / gpt-4o-mini / doubao-1.5-vision-pro(火山方舟) / glm-4v / qwen-vl-plus；DeepSeek 纯文本不支持。base_url/api_key 留空则复用上方 llm 的",
+    "_说明": "画面提示词反推：填了 model 即启用（分析时下载视频画面并抽帧）。需要支持图像的模型，如 gpt-4o / gpt-4o-mini / doubao-1.5-vision-pro(火山方舟) / glm-4v / qwen-vl-plus；DeepSeek 纯文本不支持。base_url/api_key 留空则复用上方 llm 的。智谱 glm-4v-flash 的 max_tokens 上限 1024，需在 max_tokens 填 1024",
     "model": "",
     "base_url": "",
     "api_key": "",
-    "max_frames": 8
+    "max_frames": 8,
+    "max_tokens": 2500
   },
   "paths": {
     "reports": "reports",
