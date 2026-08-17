@@ -321,6 +321,8 @@ function renderPrompts(items, list) {
 
 function packBlock(p) {
   const rows = [
+    ["Seedance 2.0/2.5（中文，直接粘贴）", p.seedance_zh],
+    ["Seedance（英文）", p.seedance_en],
     ["可灵（中文，直接粘贴）", p.kling_zh],
     ["可灵（英文）", p.kling_en],
     ["即梦（中文，直接粘贴）", p.jimeng_zh],
