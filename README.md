@@ -6,6 +6,7 @@
 ## 功能
 
 - 支持 B站 / YouTube / 抖音 / 快手 / 小红书等 yt-dlp 可解析的站点（音频轨下载）
+- **支持上传本地视频/音频文件直接拆解**（Web 页面上传，或 CLI 直接传文件路径；跳过下载步骤，自动探测时长）
 - 本地 faster-whisper 转写（免费）或 OpenAI 兼容 ASR 接口
 - 任意 OpenAI 兼容 LLM（DeepSeek / 豆包 / 智谱 / OpenAI）按"七维拆解模型"输出结构化 JSON
 - **画面提示词反推（可选）**：抽关键帧 + 多模态视觉模型，反推"这条视频用 AI 怎么生成"的文生视频/图生视频提示词（分镜级）
@@ -33,13 +34,14 @@ python webui.py            # 默认 http://127.0.0.1:8765，自动打开浏览�
 python webui.py --port 9000 --no-open
 ```
 
-页面上：粘贴链接 → 开始拆解 → 左侧实时日志 → 报告即出；另有钩子库 / 提示词库 / 历史报告三个面板。所有数据只在本机（仅绑定 127.0.0.1）。
+页面上：粘贴链接（或上传本地视频文件）→ 开始拆解 → 左侧实时日志 → 报告即出；另有钩子库 / 提示词库 / 历史报告三个面板。所有数据只在本机（仅绑定 127.0.0.1）。
 
 ## 命令行
 
 ```bash
-# 拆解一条视频（最简用法）
+# 拆解一条视频（最简用法，链接或本地文件路径均可）
 python main.py "https://www.bilibili.com/video/BVxxxxxx"
+python main.py "D:\videos\sample.mp4"
 
 # 指定转写引擎与 Whisper 模型（tiny/base/small/medium）
 python main.py analyze "https://www.youtube.com/watch?v=xxxx" --engine local --whisper-model small

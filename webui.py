@@ -25,6 +25,13 @@ JOBS = {}
 JOBS_LOCK = threading.Lock()
 _JOB_SEQ = [0]
 
+# 允许上传的本地媒体扩展名（视频 + 音频）
+_UPLOAD_SUFFIXES = {
+    ".mp4", ".mov", ".mkv", ".webm", ".avi", ".flv", ".ts", ".m4v",
+    ".mts", ".m2ts", ".wmv", ".mpg", ".mpeg", ".3gp",
+    ".mp3", ".m4a", ".wav", ".aac", ".ogg", ".flac", ".opus", ".wma",
+}
+
 
 def start_job(url, opts):
     with JOBS_LOCK:
@@ -56,7 +63,7 @@ def start_job(url, opts):
                     "md": md,
                     "html": md_to_html(md),
                 }
-        except Exception as e:  # noqa: BLE001
+        except BaseException as e:  # noqa: BLE001  SystemExit（如未配置 LLM Key）也要落为 error，避免任务永久 running
             with JOBS_LOCK:
                 if jid in JOBS:
                     JOBS[jid]["status"] = "error"
@@ -145,7 +152,7 @@ class Handler(BaseHTTPRequestHandler):
             body = self._read_body()
             url = (body.get("url") or "").strip()
             if not url.startswith(("http://", "https://")):
-                return self._json(400, {"error": "请粘贴 http(s) 开头的视频链接"})
+                return self._json(400, {"error": "请粘贴 http(s) 开头的视频链接，或在上方上传本地视频文件"})
             opts = {
                 "engine": body.get("engine") or None,
                 "whisper_model": body.get("whisper_model") or "small",
@@ -156,10 +163,42 @@ class Handler(BaseHTTPRequestHandler):
             }
             jid = start_job(url, opts)
             return self._json(200, {"job_id": jid})
+        if path == "/api/upload":
+            name = (_q(self.path, "name") or "").strip()
+            if not name or "/" in name or "\\" in name or name.startswith("."):
+                return self._json(400, {"error": "非法的文件名"})
+            ext = pathlib.Path(name).suffix.lower()
+            if ext not in _UPLOAD_SUFFIXES:
+                return self._json(400, {"error": f"不支持的文件类型（{ext or '无扩展名'}），请上传视频/音频文件"})
+            try:
+                dest = _save_upload(self, name)
+            except Exception as e:  # noqa: BLE001
+                return self._json(400, {"error": f"保存上传文件失败：{e}"})
+            opts = {
+                "engine": _q(self.path, "engine") or None,
+                "whisper_model": _q(self.path, "whisper_model") or "small",
+                "vision": _q(self.path, "vision") != "0",
+            }
+            jid = start_job(str(dest), opts)
+            return self._json(200, {"job_id": jid, "name": dest.name})
         if path == "/api/cookiefile":
             body = self._read_body()
             saved = save_cookiefile((body or {}).get("path") or "")
             return self._json(200, {"ok": True, "path": saved})
+        if path == "/api/rewrite":
+            from breakdown.rewrite import rewrite_prompts
+
+            body = self._read_body()
+            url = ((body or {}).get("url") or "").strip()
+            rec = next((r for r in lib.search_prompts(_lib_dir()) if r.get("url") == url), None)
+            if not rec:
+                return self._json(404, {"error": "未找到该反推记录，请先拆解并启用画面提示词反推"})
+            try:
+                pack = rewrite_prompts(rec)
+            except Exception as e:  # noqa: BLE001
+                return self._json(500, {"error": f"改写失败：{e}"})
+            lib.save_prompt_pack(_lib_dir(), url, pack)
+            return self._json(200, {"ok": True, "pack": pack})
         if path == "/api/cancel":
             jid = (self._read_body() or {}).get("job_id") or ""
             with JOBS_LOCK:
@@ -176,6 +215,33 @@ def _q(query_string, key):
     qs = query_string.split("?", 1)[1] if "?" in query_string else query_string
     vals = parse_qs(qs).get(key)
     return vals[0] if vals else ""
+
+
+def _save_upload(handler, name):
+    """把请求体流式写入 work/uploads/<时间戳>-<文件名>，返回目标路径。"""
+    length = int(handler.headers.get("Content-Length") or 0)
+    if length <= 0:
+        raise RuntimeError("空请求体")
+    uploads = _ROOT / "work" / "uploads"
+    uploads.mkdir(parents=True, exist_ok=True)
+    import time
+
+    dest = uploads / f"{time.strftime('%Y%m%d-%H%M%S')}-{name}"
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    try:
+        with open(tmp, "wb") as f:
+            remaining = length
+            while remaining > 0:
+                chunk = handler.rfile.read(min(1 << 20, remaining))
+                if not chunk:
+                    raise RuntimeError("上传中断（连接提前关闭）")
+                f.write(chunk)
+                remaining -= len(chunk)
+        tmp.replace(dest)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+    return dest
 
 
 def _reports_dir():

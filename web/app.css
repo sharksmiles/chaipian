@@ -87,6 +87,13 @@ button { font-family: inherit; }
 }
 #url::placeholder { color: var(--ink-2); opacity: .8; }
 #url:focus { border-color: var(--accent); background: #fffdf6; }
+.upload-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.upload-btn { padding: 8px 14px; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.upload-name {
+  font-size: 12.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; max-width: 100%; min-width: 0;
+}
+.upload-note { color: var(--ink-2); }
 .form-row { display: flex; gap: 10px; margin-top: 12px; }
 .btn {
   border-radius: 2px; font-size: 14px; padding: 9px 18px; cursor: pointer;
@@ -215,6 +222,28 @@ button { font-family: inherit; }
 .lib-empty { padding: 44px 4px; color: var(--ink-2); }
 .lib-empty .empty-kicker { margin-bottom: 8px; }
 .lib-item:last-child { border-bottom: 1px solid var(--line); }
+
+/* ── 提示词包（改写结果）────────────── */
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.lib-item-actions { margin-top: 6px; }
+.pack {
+  margin-top: 10px; padding: 12px 14px; border: 1px dashed var(--line);
+  background: color-mix(in srgb, var(--marker) 22%, var(--paper-2));
+  border-radius: 2px; display: grid; gap: 8px;
+}
+.pack-title { margin: 0; font-size: 12.5px; font-weight: 700; color: var(--accent-deep); letter-spacing: .08em; }
+.pack-row { display: grid; grid-template-columns: 96px 1fr auto; gap: 10px; align-items: start; }
+.pack-label { font-size: 12px; color: var(--ink-2); padding-top: 6px; line-height: 1.5; }
+.pack-pre {
+  margin: 0; padding: 8px 10px; background: var(--paper-3); border: 1px solid var(--line);
+  border-radius: 2px; font-family: var(--mono); font-size: 12px; line-height: 1.7;
+  white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere;
+}
+.pack-params { margin: 2px 0 0; font-size: 12px; color: var(--warn); }
+@media (max-width: 720px) {
+  .pack-row { grid-template-columns: 1fr; }
+  .pack-row .btn-sm { justify-self: start; }
+}
 
 /* ── 页脚 ─────────────────────────── */
 .foot {

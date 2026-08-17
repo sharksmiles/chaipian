@@ -182,5 +182,44 @@ def search_prompts(libdir, query=""):
         except Exception:  # noqa: BLE001
             continue
         if not query or query in json.dumps(rec, ensure_ascii=False).lower():
+            rec["pack"] = get_prompt_pack(libdir, rec.get("url", ""))
             results.append(rec)
     return results
+
+
+def get_prompt_pack(libdir, url):
+    """按 url 查已改写的提示词包（prompt_packs.jsonl）"""
+    path = pathlib.Path(libdir) / "prompt_packs.jsonl"
+    if not path.exists() or not url:
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except Exception:  # noqa: BLE001
+            continue
+        if rec.get("url") == url:
+            return rec.get("pack")
+    return None
+
+
+def save_prompt_pack(libdir, url, pack):
+    """保存/覆盖某 url 的改写提示词包"""
+    libdir = pathlib.Path(libdir)
+    libdir.mkdir(parents=True, exist_ok=True)
+    path = libdir / "prompt_packs.jsonl"
+    lines = []
+    if path.exists():
+        lines = [l for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    kept = []
+    for line in lines:
+        try:
+            rec = json.loads(line)
+        except Exception:  # noqa: BLE001
+            continue
+        if rec.get("url") != url:
+            kept.append(line)
+    kept.append(json.dumps({"url": url, "pack": pack}, ensure_ascii=False))
+    path.write_text("\n".join(kept) + "\n", encoding="utf-8")

@@ -5,9 +5,31 @@ import sys
 
 def transcribe(audio_path, cfg, engine=None, model_size="small", language="zh"):
     engine = engine or cfg["transcribe"].get("engine", "local")
+    _check_audio_stream(audio_path)
     if engine == "api":
         return _transcribe_api(audio_path, cfg["transcribe"])
     return _transcribe_local(audio_path, model_size, language)
+
+
+def _check_audio_stream(path):
+    """预检媒体是否含音轨。
+
+    faster-whisper / PyAV 对无音轨文件（静音视频、纯视频流）的报错是晦涩的
+    IndexError，这里提前给出可读的错误；探测失败则交给转写引擎自己报错。
+    """
+    try:
+        import av
+
+        container = av.open(str(path))
+        has_audio = bool(container.streams.audio)
+        container.close()
+    except Exception:  # noqa: BLE001
+        return
+    if not has_audio:
+        raise RuntimeError(
+            f"该媒体文件没有音轨（{pathlib.Path(path).name}），无法转写。\n"
+            "可能原因：视频本身是静音/无声音轨（如部分录屏、工程导出），请换有声音的视频。"
+        )
 
 
 def _transcribe_local(audio_path, model_size, language):

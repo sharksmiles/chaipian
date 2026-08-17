@@ -7,7 +7,7 @@ import pathlib
 import sys
 
 from .config import llm_key_ready, load_config
-from .downloader import fetch_video
+from .downloader import fetch_video, meta_for_local_file
 from .transcriber import transcribe
 from .analyzer import analyze
 from .vision import analyze_vision
@@ -47,9 +47,21 @@ def run_pipeline(url, cfg=None, opts=None, on_progress=None, stop_event=None):
     libdir.mkdir(parents=True, exist_ok=True)
 
     report(f"① 下载解析：{url}")
-    meta, audio_path, video_path = fetch_video(
-        url, work, cookies, prefer_combined=vision_on, cookiefile=cookies_file
-    )
+    local_path = None
+    if isinstance(url, pathlib.Path):
+        local_path = url
+    elif isinstance(url, str):
+        p = pathlib.Path(url)
+        if p.is_file():
+            local_path = p
+    if local_path is not None:
+        report(f"　本地文件：{local_path.name}（跳过 yt-dlp 下载，直接转写/抽帧）")
+        meta = meta_for_local_file(local_path)
+        audio_path = video_path = local_path
+    else:
+        meta, audio_path, video_path = fetch_video(
+            url, work, cookies, prefer_combined=vision_on, cookiefile=cookies_file
+        )
     report(f"　标题：{meta['title']} ｜ 作者：{meta['uploader'] or '未知'} ｜ 时长：{meta['duration']}s")
     if cancelled():
         raise RuntimeError("已取消")

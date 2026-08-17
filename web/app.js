@@ -2,7 +2,7 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 
-const state = { jobId: null, timer: null, seen: 0 };
+const state = { jobId: null, timer: null, seen: 0, file: null };
 
 async function api(path, opt) {
   const r = await fetch(path, opt);
@@ -69,11 +69,20 @@ async function initCfg() {
 }
 
 /* ── 拆解任务 ─────────────────────── */
+$("#file-input").addEventListener("change", (ev) => {
+  const f = ev.target.files[0] || null;
+  state.file = f;
+  $("#file-name").textContent = f
+    ? `${f.name}（${(f.size / 1048576).toFixed(1)} MB）`
+    : "未选择文件";
+});
+
 $("#analyze-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const url = $("#url").value.trim();
-  if (!/^https?:\/\//.test(url)) {
-    logLine("❌ 请粘贴 http(s) 开头的视频链接", "l-err");
+  const file = state.file;
+  if (!/^https?:\/\//.test(url) && !file) {
+    logLine("❌ 请粘贴 http(s) 开头的视频链接，或先选择本地视频文件", "l-err");
     return;
   }
   resetLog();
@@ -88,18 +97,37 @@ $("#analyze-form").addEventListener("submit", async (ev) => {
         body: JSON.stringify({ path: cf }),
       }).catch(() => {});
     }
-    const body = {
-      url,
-      engine: $("#engine").value,
-      whisper_model: $("#whisper-model").value,
-      vision: $("#vision").checked,
-      cookies_file: cf,
-    };
-    const { job_id } = await api("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    let job_id;
+    if (file) {
+      const params = new URLSearchParams({
+        name: file.name,
+        engine: $("#engine").value,
+        whisper_model: $("#whisper-model").value,
+        vision: $("#vision").checked ? "1" : "0",
+      });
+      logLine(`⬆ 上传本地文件：${file.name}（${(file.size / 1048576).toFixed(1)} MB）`, "l-warn");
+      const d = await api("/api/upload?" + params.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: file,
+      });
+      job_id = d.job_id;
+      logLine("✅ 上传完成，开始拆解…", "l-done");
+    } else {
+      const body = {
+        url,
+        engine: $("#engine").value,
+        whisper_model: $("#whisper-model").value,
+        vision: $("#vision").checked,
+        cookies_file: cf,
+      };
+      const d = await api("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      job_id = d.job_id;
+    }
     state.jobId = job_id;
     poll();
   } catch (e) {
@@ -198,6 +226,10 @@ function esc(s) {
   return d.innerHTML;
 }
 
+function escAttr(s) {
+  return esc(s).replace(/"/g, "&quot;");
+}
+
 function renderHooks(items, list) {
   for (const r of items) {
     const div = document.createElement("div");
@@ -227,11 +259,91 @@ function renderPrompts(items, list) {
       <p class="lib-item-line"><b>类型判断</b>　${esc(r.video_type || "-")}</p>
       ${r.overall_zh ? `<p class="lib-item-line"><b>整体提示词(ZH)</b>　${esc(r.overall_zh)}</p>` : ""}
       ${kws ? `<p class="lib-item-line"><b>风格</b>　${kws}</p>` : ""}
-      ${r.recreate_notes ? `<p class="lib-item-line"><b>复刻建议</b>　${esc(r.recreate_notes)}</p>` : ""}`;
-    div.addEventListener("click", () => openUrl(r.url));
+      ${r.recreate_notes ? `<p class="lib-item-line"><b>复刻建议</b>　${esc(r.recreate_notes)}</p>` : ""}
+      <p class="lib-item-actions">
+        <button class="btn btn-ghost btn-sm" data-act="rewrite" data-url="${escAttr(r.url || "")}">
+          ${r.pack ? "重新改写提示词包" : "改写为可直接用的提示词包"}
+        </button>
+      </p>
+      ${r.pack ? packBlock(r.pack) : ""}`;
+    div.addEventListener("click", (ev) => {
+      if (ev.target.closest("button")) return;
+      openUrl(r.url);
+    });
     list.appendChild(div);
   }
 }
+
+function packBlock(p) {
+  const rows = [
+    ["可灵（中文，直接粘贴）", p.kling_zh],
+    ["可灵（英文）", p.kling_en],
+    ["即梦（中文，直接粘贴）", p.jimeng_zh],
+    ["负向提示词", p.negative],
+  ];
+  const params = p.params
+    ? `<p class="pack-params">参数建议：${esc(Object.entries(p.params).map(([k, v]) => `${k} ${v}`).join(" ｜ "))}</p>`
+    : "";
+  return `
+    <div class="pack">
+      <p class="pack-title">提示词包 · 已按生成工具改写</p>
+      ${rows
+        .filter(([, v]) => v)
+        .map(
+          ([label, v]) => `
+        <div class="pack-row">
+          <span class="pack-label">${esc(label)}</span>
+          <pre class="pack-pre">${esc(v)}</pre>
+          <button class="btn btn-ghost btn-sm" data-act="copy" data-text="${escAttr(v)}">复制</button>
+        </div>`
+        )
+        .join("")}
+      ${params}
+    </div>`;
+}
+
+async function doRewrite(btn) {
+  const url = btn.dataset.url;
+  btn.disabled = true;
+  const old = btn.textContent;
+  btn.textContent = "改写中…";
+  try {
+    await api("/api/rewrite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    logLine("✅ 提示词包已生成（消耗一次 LLM 调用）", "l-done");
+    await loadLib("prompts");
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = old;
+    logLine("❌ 改写失败：" + e.message, "l-err");
+  }
+}
+
+async function copyText(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  const old = btn.textContent;
+  btn.textContent = "已复制 ✓";
+  setTimeout(() => (btn.textContent = old), 1200);
+}
+
+document.addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button[data-act]");
+  if (!btn) return;
+  if (btn.dataset.act === "rewrite") doRewrite(btn);
+  if (btn.dataset.act === "copy") copyText(btn.dataset.text, btn);
+});
 
 function openUrl(url) {
   if (url) window.open(url, "_blank", "noopener");

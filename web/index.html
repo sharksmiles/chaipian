@@ -28,9 +28,16 @@
     <section class="rail-section">
       <h2 class="rail-title" data-no="01">输入样本</h2>
       <form id="analyze-form">
-        <input id="url" type="text" required
+        <input id="url" type="text"
                placeholder="粘贴视频链接：B站 / YouTube / 抖音 / 快手…"
                autocomplete="off" spellcheck="false">
+        <div class="upload-row">
+          <label class="btn btn-ghost upload-btn" for="file-input">⬆ 上传本地视频</label>
+          <input type="file" id="file-input" hidden
+                 accept=".mp4,.mov,.mkv,.webm,.avi,.flv,.ts,.m4v,.wmv,.mpg,.mpeg,.3gp,.mp3,.m4a,.wav,.aac,.ogg,.flac">
+          <span class="upload-name" id="file-name">未选择文件</span>
+        </div>
+        <p class="advanced-note upload-note">没有链接？可直接上传本地视频/音频文件（MP4 / MOV / MKV / WebM…），跳过下载步骤直接拆解；文件越大转写越慢。</p>
         <div class="form-row">
           <button class="btn btn-primary" id="go-btn" type="submit">开始拆解</button>
           <button class="btn btn-ghost" id="cancel-btn" type="button" hidden>中止</button>

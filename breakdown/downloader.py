@@ -114,3 +114,47 @@ def _download(url, out_dir, cookies_from_browser, fmt, cookiefile=None):
         "thumbnail": str(info.get("thumbnail") or ""),
     }
     return meta, media
+
+
+def meta_for_local_file(path):
+    """本地视频/音频文件：跳过 yt-dlp，直接用文件做转写与抽帧。
+
+    返回与 fetch_video 相同结构的 meta；时长用 PyAV 探测（失败则为 0）。
+    """
+    path = pathlib.Path(path)
+    return {
+        "url": path.name,
+        "platform": "本地文件",
+        "title": path.stem or path.name,
+        "uploader": "",
+        "duration": _probe_duration(path),
+        "upload_date": "",
+        "view_count": None,
+        "like_count": None,
+        "comment_count": None,
+        "description": "",
+        "thumbnail": "",
+    }
+
+
+def _probe_duration(path):
+    """用 PyAV 探测媒体时长（秒）；PyAV 不可用或失败时返回 0。"""
+    try:
+        import av
+
+        container = av.open(str(path))
+        try:
+            dur = float(container.duration or 0) / 1_000_000.0  # AV_TIME_BASE
+        except Exception:  # noqa: BLE001
+            dur = 0.0
+        if dur <= 0:
+            stream = container.streams.video[0] if container.streams.video else None
+            if stream is not None:
+                try:
+                    dur = float(stream.duration * stream.time_base)
+                except Exception:  # noqa: BLE001
+                    dur = 0.0
+        container.close()
+        return int(dur) if dur > 0 else 0
+    except Exception:  # noqa: BLE001
+        return 0

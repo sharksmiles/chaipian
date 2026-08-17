@@ -3,6 +3,7 @@ import json
 import pathlib
 import shutil
 import sys
+import tempfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
@@ -17,9 +18,11 @@ from breakdown.utils import format_transcript  # noqa: E402
 import breakdown.vision as vision_mod  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-TEST_DIR = ROOT / "work" / "test_pipeline"
-REPORTS = ROOT / "reports"
-LIB = ROOT / "library"
+# 关键：使用临时目录，绝不碰真实的 reports/ 与 library/（否则会清掉用户数据）
+_TMP = pathlib.Path(tempfile.mkdtemp(prefix="chaipian-test-"))
+TEST_DIR = _TMP / "work"
+REPORTS = _TMP / "reports"
+LIB = _TMP / "library"
 for d in (TEST_DIR, REPORTS, LIB):
     d.mkdir(parents=True, exist_ok=True)
 
@@ -121,9 +124,8 @@ def main():
     print("✅ 全链路通过（含提示词反推）：", report)
     print("✅ index.csv / hooks.jsonl / prompts.jsonl 均入库，检索 OK")
 
-    # 清理测试产物，保持工作区干净
-    for p in (TEST_DIR, REPORTS, LIB):
-        shutil.rmtree(p, ignore_errors=True)
+    # 清理测试产物（临时目录，不影响真实数据）
+    shutil.rmtree(_TMP, ignore_errors=True)
     print("✅ 测试产物已清理")
 
 
